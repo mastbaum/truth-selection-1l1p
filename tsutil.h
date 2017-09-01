@@ -20,10 +20,12 @@ bool inFV(const sim::MCShower& show);
 bool inFV(const sim::MCTrack& track);
 
 // Check if shower is from vertex (within distance tolerance)
-bool isFromNuVertex(const simb::MCTruth& mc, const sim::MCShower& show);
+bool isFromNuVertex(const simb::MCTruth& mc, const sim::MCShower& show,
+                    float distance=50.0);
 
 // Check if track is from vertex (within distance tolerance)
-bool isFromNuVertex(const simb::MCTruth& mc, const sim::MCTrack& track);
+bool isFromNuVertex(const simb::MCTruth& mc, const sim::MCTrack& track,
+                    float distance=50.0);
 
 // Calculate the CCQE energy from lepton four-momentum
 double eccqe(const TLorentzVector& v);

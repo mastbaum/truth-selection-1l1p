@@ -7,9 +7,10 @@ HEADERS = $(filter-out $(FMWK_HEADERS), $(wildcard *.h))
 OBJECTS = $(SOURCES:.cxx=.o)
 
 # include options for this package
-INCFLAGS  = -I.                       #Include itself
+INCFLAGS  = -I.
 INCFLAGS += $(shell gallery-config --includes)
 INCFLAGS += $(shell gallery-fmwk-config --includes)
+INCFLAGS += -I${UBOONECODE_INC}
 
 # platform-specific options
 OSNAME          = $(shell uname -s)

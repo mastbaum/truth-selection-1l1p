@@ -1,12 +1,12 @@
 void plot() {
-  TFile* f = TFile::Open("sel_e.root");
+  TFile* f = TFile::Open("sel_inc_short.root");
   TNtuple* data = (TNtuple*) f->Get("data");
 
   THStack* hs = new THStack("hs", "");
-  data->Draw("eccqe>>h0cc( 25,0,2500)", "lpid==11&&mode== 0", "goff");
-  data->Draw("eccqe>>h1cc( 25,0,2500)", "lpid==11&&mode== 1", "goff");
-  data->Draw("eccqe>>h2cc( 25,0,2500)", "lpid==11&&mode== 2", "goff");
-  data->Draw("eccqe>>h10cc(25,0,2500)", "lpid==11&&mode==10", "goff");
+  data->Draw("eccqe>>h0cc( 25,0,2500)", "lpid==11&&ccnc==0&&mode==0", "goff");
+  data->Draw("eccqe>>h1cc( 25,0,2500)", "lpid==11&&ccnc==0&&mode==1", "goff");
+  data->Draw("eccqe>>h2cc( 25,0,2500)", "lpid==11&&ccnc==0&&mode==2", "goff");
+  data->Draw("eccqe>>h10cc(25,0,2500)", "lpid==11&&ccnc==0&&mode==10", "goff");
 
   //data->Draw("eccqe>>h0nc( 25,0,2500)", "lpid==13&&mode== 0&&ccnc==1", "goff");
   //data->Draw("eccqe>>h1nc( 25,0,2500)", "lpid==13&&mode== 1&&ccnc==1", "goff");
@@ -60,10 +60,10 @@ void plot() {
   l->Draw();
 
   gPad->Update();
-  TPaveText* title = (TPaveText*) gPad->GetPrimitive("title");
-  title->SetBorderSize(0);
-  title->SetFillColor(kWhite);
-  title->SetTextFont(132);
+  //TPaveText* title = (TPaveText*) gPad->GetPrimitive("title");
+  //title->SetBorderSize(0);
+  //title->SetFillColor(kWhite);
+  //title->SetTextFont(132);
   gPad->Update();
   gPad->Update();
 }

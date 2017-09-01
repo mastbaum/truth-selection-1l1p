@@ -11,10 +11,13 @@ def process_files(outfile, dataset_id, files):
     # Set input root file
     print glob(files)
     for _f in glob(files):
-        print 'FILE', _f
-        ff = TFile(_f)
-        ok = ff.IsOpen() and not ff.IsZombie()
-        ff.Close()
+        #print 'FILE', _f
+        #ff = TFile(_f)
+        #ok = ff.IsOpen() and not ff.IsZombie()
+        #ff.Close()
+        ok = True
+
+        if '_241' in _f: continue
 
         if ok:
             my_proc.add_input_file(_f)
@@ -24,7 +27,8 @@ def process_files(outfile, dataset_id, files):
 
     # Configure analysis module
     exampleModule = galleryfmwk.sel()
-    #exampleModule.setEventWeightProducer("eventweight")
+    exampleModule.setFluxWeightProducer("eventweight")
+    exampleModule.setEventWeightProducer("mcweight")
     exampleModule.setMCTruthProducer("generator");
     exampleModule.setMCTrackProducer("mcreco");
     exampleModule.setMCShowerProducer("mcreco"); 

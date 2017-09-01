@@ -25,17 +25,19 @@ bool inFV(const sim::MCTrack& t) {
 }
 
 
-bool isFromNuVertex(const simb::MCTruth& mc, const sim::MCShower& show) {
+bool isFromNuVertex(const simb::MCTruth& mc, const sim::MCShower& show,
+                    float distance) {
   TLorentzVector nuVtx = mc.GetNeutrino().Nu().Trajectory().Position(0);
   TLorentzVector showStart = show.Start().Position();
-  return (showStart - nuVtx).Mag() < 0.01;
+  return (showStart - nuVtx).Mag() < distance;
 }
 
 
-bool isFromNuVertex(const simb::MCTruth& mc, const sim::MCTrack& track) {
+bool isFromNuVertex(const simb::MCTruth& mc, const sim::MCTrack& track,
+                    float distance) {
   TLorentzVector nuVtx = mc.GetNeutrino().Nu().Trajectory().Position(0);
   TLorentzVector trkStart = track.Start().Position();
-  return (trkStart - nuVtx).Mag() < 0.01;
+  return (trkStart - nuVtx).Mag() < distance;
 }
 
 double eccqe(const TLorentzVector& v) {
