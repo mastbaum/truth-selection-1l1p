@@ -4,32 +4,27 @@
 #include <vector>
 
 #include "canvas/Utilities/InputTag.h"
-#include "canvas/Persistency/Common/FindMany.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
 #include "lardataobj/MCBase/MCShower.h"
 #include "lardataobj/MCBase/MCTrack.h"
 #include "gallery/Event.h"
 
-#include <TLorentzVector.h>
 #include <TH2F.h>
 #include <TH1F.h>
-#include <TNtuple.h>
 
-#include "tsutil.h"
-#include "make_dedx_pdfs.h"
+#include "TSUtil.h"
+#include "TSPDFGen.h"
+#include "TSSelection.h"
 
 namespace galleryfmwk {
 
-bool make_dedx_pdfs::initialize() {
+bool TSPDFGen::initialize() {
   return true;
 }
 
 
-bool make_dedx_pdfs::analyze(gallery::Event* ev) {
-  // Get event data
-  // art::InputTag eventweight_tag(_ew_producer);
-  // auto const& eventweights_list = (*ev->getValidHandle<std::vector<evwgh::MCEventWeight> >(eventweight_tag));
-
+bool TSPDFGen::analyze(gallery::Event* ev) {
+  // Get handles for event data
   art::InputTag mctruth_tag(_mct_producer);
   auto const& mctruth_list = (*ev->getValidHandle<std::vector<simb::MCTruth> >(mctruth_tag));
 
@@ -41,19 +36,21 @@ bool make_dedx_pdfs::analyze(gallery::Event* ev) {
 
   _fout->cd();
 
+  // Loop over MCTruth interactions
   for(size_t i=0; i<mctruth_list.size(); i++) {
     auto const& mctruth = mctruth_list.at(i);
 
     // Get vertex-associated contained tracks
     for (size_t j=0; j<mctrack_list.size(); j++) {
       const sim::MCTrack& mct = mctrack_list.at(j);
-      if (mct.empty() || mct.Start().E() < 60 ||
-          !isFromNuVertex(mctruth, mct) || !inFV(mct)) {
+
+      if (!TSSelection::goodTrack(mct, mctruth)) {
         continue;
       }
 
       int pdg = mct.PdgCode();
 
+      // Create dE/dx distribution for this PDG code
       if (_trackdedxs.find(pdg) == _trackdedxs.end()) {
         char hname[50];
         snprintf(hname, 50, "htrackdedx_%i", pdg);
@@ -62,31 +59,29 @@ bool make_dedx_pdfs::analyze(gallery::Event* ev) {
 
       assert(!mct.dEdx().empty());
 
-      double s = 0;
-      TLorentzVector pos = mct.End().Position();
-      for (long k=mct.size()-1; k>=0; k--) {
-        double dedx = mct.dEdx()[k];
-        _trackdedxs.at(pdg)->Fill(s, dedx);
-        s += (pos.Vect() - mct[k].Position().Vect()).Mag();
-        pos = mct[k].Position();
-      }
+      // Build up the track distribution
+      TH2F* h = tsutil::HistDEdx(mct);
+      _trackdedxs[pdg]->Add(h);
     }
 
     // Get vertex-associated contained showers
     for (size_t j=0; j<mcshower_list.size(); j++) {
       const sim::MCShower& mcs = mcshower_list.at(j);
-      if (!isFromNuVertex(mctruth, mcs) || !inFV(mcs)) {
+
+      if (!TSSelection::goodShower(mcs, mctruth)) {
         continue;
       }
 
       int pdg = mcs.PdgCode();
 
+      // Create dE/dx distribution
       if (_showerdedxs.find(pdg) == _showerdedxs.end()) {
         char hname[50];
         snprintf(hname, 50, "hshowerdedx_%i", pdg);
         _showerdedxs[pdg] = new TH1F(hname, ";dE/dx (MeV/cm?);Entries", 100, 0, 10);
       }
 
+      // Build up the shower distribution
       double dedx = mcs.dEdx();
       _showerdedxs.at(mcs.PdgCode())->Fill(dedx);
     }
@@ -96,7 +91,8 @@ bool make_dedx_pdfs::analyze(gallery::Event* ev) {
 }
 
 
-bool make_dedx_pdfs::finalize() {
+bool TSPDFGen::finalize() {
+  // Write ROOT file output
   if (_fout) {
     _fout->cd();
 

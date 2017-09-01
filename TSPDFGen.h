@@ -1,11 +1,11 @@
 /**
- * \file make_dedx_pdfs.h
+ * \file TSPDFGen.h
  * \brief A truth-based event selection
  * \author A. Mastbaum <mastbaum@uchicago.edu>
  */
 
-#ifndef GALLERY_FMWK_MAKE_DEDX_PDFS_ANA_H
-#define GALLERY_FMWK_MAKE_DEDX_PDFS_ANA_H
+#ifndef GALLERY_FMWK_TSPDFGEN_H
+#define GALLERY_FMWK_TSPDFGEN_H
 
 #include <map>
 #include <string>
@@ -18,13 +18,13 @@ class TH2F;
 namespace galleryfmwk {
 
 /**
- * \class make_dedx_pdfs
+ * \class TSPDFGen
  * \brief Truth-based selection approximating 1l1p
  */
-class make_dedx_pdfs : galleryfmwk::ana_base {
+class TSPDFGen : galleryfmwk::ana_base {
 
 public:
-  make_dedx_pdfs() : _verbose(false) {}
+  TSPDFGen() : _verbose(false) {}
 
   bool initialize();
 
@@ -54,5 +54,5 @@ protected:
 
 }  // namespace galleryfmwk
 
-#endif  // GALLERY_FMWK_MAKE_DEDX_PDFS_ANA_H
+#endif  // GALLERY_FMWK_TSPDFGEN_H
 

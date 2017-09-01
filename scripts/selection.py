@@ -1,6 +1,6 @@
-from glob import glob
 import sys
-from ROOT import gallery, galleryfmwk, TFile
+from glob import glob
+from ROOT import galleryfmwk
 
 def process_files(outfile, dataset_id, files):
     ds_id = int(dataset_id)
@@ -9,24 +9,14 @@ def process_files(outfile, dataset_id, files):
     my_proc = galleryfmwk.ana_processor()
 
     # Set input root file
-    print glob(files)
     for _f in glob(files):
-        #print 'FILE', _f
-        #ff = TFile(_f)
-        #ok = ff.IsOpen() and not ff.IsZombie()
-        #ff.Close()
-        ok = True
-
-        if '_241' in _f: continue
-
-        if ok:
-            my_proc.add_input_file(_f)
+        my_proc.add_input_file(_f)
     
     # Set output ROOT file name
     my_proc.set_ana_output_file(outfile)
 
     # Configure analysis module
-    exampleModule = galleryfmwk.sel()
+    exampleModule = galleryfmwk.TSSelection()
     exampleModule.setFluxWeightProducer("eventweight")
     exampleModule.setEventWeightProducer("mcweight")
     exampleModule.setMCTruthProducer("generator");
@@ -42,8 +32,8 @@ def process_files(outfile, dataset_id, files):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print 'Usage:', sys.argv[0], 'input.root'
+    if len(sys.argv) < 4:
+        print 'Usage:', sys.argv[0], 'output.root dataset_id "input*.root"'
         sys.exit(1)
 
     process_files(*sys.argv[1:])

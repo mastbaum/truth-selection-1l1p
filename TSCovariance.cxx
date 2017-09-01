@@ -10,33 +10,17 @@
 #include "TH1D.h"
 #include "TH2D.h"
 #include "TTree.h"
+#include "TSSelection.h"
 
-struct OutputData {
-  OutputData() {
-    weights = NULL;
-  }
-  double enu;
-  double q2;
-  double w;
-  int int_type;
-  int int_mode;
-  bool ccnc;
-  double eccqe;
-  double ep;
-  int ppdg;
-  double elep;
-  int lpdg;
-  int lpid;
-  double bnbweight;
-  int dataset;
-  std::map<std::string, std::vector<double> >* weights;
-};
+namespace galleryfmwk {
 
-class CovarianceMatrix {
+class TSCovariance {
 public:
-  CovarianceMatrix();
-  virtual ~CovarianceMatrix();
+  TSCovariance();
+  virtual ~TSCovariance();
 
+  void SetInputFile(std::string _f) { fInputFile = _f; }
+  void SetOutputFile(std::string _f) { fOutputFile = _f; }
   void init();
 
   void analyze();
@@ -106,6 +90,8 @@ public:
   };
 
 private:
+  std::string fInputFile;  //!< Input file
+  std::string fOutputFile;  //!< Output file
   std::set<std::string> use_weights;  //!< Weight functions to use
   std::vector<EventSample*> samples;  //!< Event samples
   TFile* fFile;  //!< File for output
@@ -115,10 +101,10 @@ private:
 
 
 /******************************************************************************
- ** CovarianceMatrix::EventSample implementation                             **
+ ** TSCovariance::EventSample implementation                             **
  *****************************************************************************/
 
-CovarianceMatrix::EventSample::EventSample(std::string _name,
+TSCovariance::EventSample::EventSample(std::string _name,
                                             size_t nbins,
                                             double elo, double ehi,
                                             size_t nweights)
@@ -131,13 +117,13 @@ CovarianceMatrix::EventSample::EventSample(std::string _name,
 }
 
 
-CovarianceMatrix::EventSample::~EventSample() {
+TSCovariance::EventSample::~EventSample() {
   delete cov;
   delete enu;
 }
 
 
-TGraphErrors* CovarianceMatrix::EventSample::EnuCollapsed() {
+TGraphErrors* TSCovariance::EventSample::EnuCollapsed() {
   size_t nbins = enu->GetNbinsX();
 
   // Compute the mean and standard deviation across universes using
@@ -150,7 +136,7 @@ TGraphErrors* CovarianceMatrix::EventSample::EnuCollapsed() {
   double xe[nbins];
 
   if (enu_syst.empty()) {
-    std::cout << "CovarianceMatrix::EventSample::EnuCollapsed: "
+    std::cout << "TSCovariance::EventSample::EnuCollapsed: "
               << "No multisims for sample " << name << std::endl;
     return new TGraphErrors();
   }
@@ -177,7 +163,7 @@ TGraphErrors* CovarianceMatrix::EventSample::EnuCollapsed() {
 }
 
 
-void CovarianceMatrix::EventSample::Resize(size_t nweights) {
+void TSCovariance::EventSample::Resize(size_t nweights) {
   enu_syst.clear();
   for (size_t i=0; i<nweights; i++) {
     std::string hname = Form("enu_%s_%zu", name.c_str(), i);
@@ -187,7 +173,7 @@ void CovarianceMatrix::EventSample::Resize(size_t nweights) {
 }
 
 
-TH2D* CovarianceMatrix::EventSample::CovarianceMatrix(
+TH2D* TSCovariance::EventSample::CovarianceMatrix(
     TH1D* nom, std::vector<TH1D*> syst) {
   int nbins = nom->GetNbinsX();
 
@@ -209,7 +195,7 @@ TH2D* CovarianceMatrix::EventSample::CovarianceMatrix(
 }
 
 
-TH2D* CovarianceMatrix::EventSample::CovarianceMatrix() {
+TH2D* TSCovariance::EventSample::CovarianceMatrix() {
   delete cov;
   cov = CovarianceMatrix(enu, enu_syst);
   cov->SetName(("cov_" + name).c_str());
@@ -218,7 +204,7 @@ TH2D* CovarianceMatrix::EventSample::CovarianceMatrix() {
 
 
 
-TH2D* CovarianceMatrix::EventSample::CorrelationMatrix(TH2D* _cov) {
+TH2D* TSCovariance::EventSample::CorrelationMatrix(TH2D* _cov) {
   TH2D* cor = (TH2D*) _cov->Clone("cor");
 
   for (int i=1; i<_cov->GetNbinsX()+1; i++) {
@@ -234,7 +220,7 @@ TH2D* CovarianceMatrix::EventSample::CorrelationMatrix(TH2D* _cov) {
 }
 
 
-TH2D* CovarianceMatrix::EventSample::CorrelationMatrix() {
+TH2D* TSCovariance::EventSample::CorrelationMatrix() {
   // Compute the covariance matrix first, if we haven't already
   if (!cov) {
     CovarianceMatrix();
@@ -247,23 +233,23 @@ TH2D* CovarianceMatrix::EventSample::CorrelationMatrix() {
 
 
 /******************************************************************************
- ** CovarianceMatrix implementation                                          **
+ ** TSCovariance implementation                                          **
  *****************************************************************************/
 
-CovarianceMatrix::CovarianceMatrix() {
-  fFile = TFile::Open("cov.root", "recreate");
-  assert(fFile);
-
-  init();
-}
+TSCovariance::TSCovariance() {}
 
 
-CovarianceMatrix::~CovarianceMatrix() {
+TSCovariance::~TSCovariance() {
   ofs.close();
 }
 
 
-void CovarianceMatrix::init() {
+void TSCovariance::init() {
+  assert(fInputFile != "" && fOutputFile != "");
+
+  fFile = TFile::Open(fOutputFile.c_str(), "recreate");
+  assert(fFile);
+
   samples.push_back(new EventSample("numu"));
   samples.push_back(new EventSample("nue"));
 
@@ -328,27 +314,26 @@ void CovarianceMatrix::init() {
 
   use_weights = std::set<std::string>(wv.begin(), wv.end());
 
-  std::string out_file = "cov.txt";
-  ofs.open(out_file, std::ofstream::out);
+  //std::string out_file = "cov.txt";
+  //ofs.open(out_file, std::ofstream::out);
 
-  std::cout << "CovarianceMatrix: Initialized. Weights: ";
+  std::cout << "TSCovariance: Initialized. Weights: ";
   for (auto it : use_weights) {
     std::cout << it << " ";
   }
   std::cout << std::endl;
 
-  std::cout << "CovarianceMatrix: Writing output to " << out_file << std::endl;
+  std::cout << "TSCovariance: Writing output to " << fOutputFile << std::endl;
 }
   
 
-void CovarianceMatrix::analyze() {
+void TSCovariance::analyze() {
   // Grab the MCTruth information
-  //TFile f("sel/t_e.root");
-  TFile f("./sel_num_nue.root");
+  TFile f(fInputFile.c_str());
   TTree* _tree = (TTree*) f.Get("data");
   assert(_tree && _tree->GetEntries() > 0);
 
-  OutputData _data;
+  galleryfmwk::TSSelection::OutputData _data;
   _tree->SetBranchAddress("enu", &_data.enu);
   _tree->SetBranchAddress("q2", &_data.q2);
   _tree->SetBranchAddress("w", &_data.w);
@@ -383,7 +368,7 @@ void CovarianceMatrix::analyze() {
       assert(wmin < 1000000);
       weights.resize(wmin, 1.0);
 
-      std::cout << "CovarianceMatrix: Found weight: " << it.first << std::endl;
+      std::cout << "TSCovariance: Found weight: " << it.first << std::endl;
 
       // Compute universe-wise product of all requsted weights
       if (use_weights.find("*") != use_weights.end() ||
@@ -423,7 +408,7 @@ void CovarianceMatrix::analyze() {
     sample->enu->Fill(nuEnergy);
 
     // Fill weights
-    std::cout << "CovarianceMatrix: Weights: ";
+    std::cout << "TSCovariance: Weights: ";
     ofs << _data.lpdg << "\t" << nuEnergy << "\t";
     for (size_t i=0; i<weights.size(); i++) {
       sample->enu_syst[i]->Fill(nuEnergy, weights[i]);
@@ -488,10 +473,5 @@ void CovarianceMatrix::analyze() {
   gcor->Write();
 }
 
-
-int main(int argc, char* argv[]) {
-  CovarianceMatrix cov;
-  cov.analyze();
-  return 0;
-}
+}  // namespace galleryfmwk
 

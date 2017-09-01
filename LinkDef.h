@@ -4,9 +4,10 @@
 #pragma link off all functions;
 
 #pragma link C++ class std::map<std::string, std::vector<double> >+;
-#pragma link C++ class galleryfmwk::make_dedx_pdfs+;
-#pragma link C++ class galleryfmwk::sel+;
-#pragma link C++ class galleryfmwk::pot+;
+#pragma link C++ class galleryfmwk::TSPDFGen+;
+#pragma link C++ class galleryfmwk::TSSelection+;
+#pragma link C++ class galleryfmwk::TSUtil+;
+#pragma link C++ class galleryfmwk::TSCovariance+;
 //ADD_NEW_CLASS ... do not change this line
 #endif
 

@@ -1,16 +1,20 @@
 /**
- * \file sel.h
- * \brief A truth-based event selection
+ * \file TSSelection.h
+ * \brief A truth-based 1l1p event selection
  * \author A. Mastbaum <mastbaum@uchicago.edu>
  */
 
-#ifndef GALLERY_FMWK_SEL_ANA_H
-#define GALLERY_FMWK_SEL_ANA_H
+#ifndef GALLERY_FMWK_TSSELECTION_H
+#define GALLERY_FMWK_TSSELECTION_H
 
 #include <map>
 #include <string>
 
+#include "nusimdata/SimulationBase/MCTruth.h"
+#include "lardataobj/MCBase/MCShower.h"
+#include "lardataobj/MCBase/MCTrack.h"
 #include "Analysis/ana_base.h"
+#include "TSUtil.h"
 
 class TDatabasePDG;
 class TFile;
@@ -21,13 +25,25 @@ class TTree;
 namespace galleryfmwk {
 
 /**
- * \class sel
+ * \class TSSelection
  * \brief Truth-based selection approximating 1l1p
  */
-class sel : galleryfmwk::ana_base {
+class TSSelection : galleryfmwk::ana_base {
 
 public:
-  sel() : _verbose(false) {}
+  // A structure to hold temporary track/shower data during processing
+  struct PIDParticle {
+    int pdg;
+    int pdgtrue;
+    TLorentzVector p;
+    double evis;
+    double eccqe;
+
+    // Output stream operator to print a PIDParticle
+    friend std::ostream& operator<<(std::ostream& os, const PIDParticle& dt);
+  };
+
+  TSSelection() : _verbose(false) {}
 
   bool initialize();
 
@@ -45,12 +61,32 @@ public:
   void setMCShowerProducer(std::string s) { _mcshw_producer = s; }
   void setMCTrackProducer(std::string s) { _mctrk_producer = s; }
 
-  // Set a numeric dataset ID, which is written into the tree
+  // Set a numeric dataset ID, which is written into the tree as a tag
   void setDatasetID(int id) { _dataset_id = id; }
 
-  double get_mass(int pdg) const;
+  // Utility function to test if a list of particles is 1l1p
+  static bool is1l1p(std::vector<PIDParticle>& p, int lpdg);
 
+  // Apply track cuts
+  static inline bool goodTrack(const sim::MCTrack& t, const simb::MCTruth& truth) {
+    return (!t.empty() &&
+            tsutil::isFromNuVertex(truth, t) &&
+            t.Process() == "primary" &&
+            t.Start().E() - tsutil::get_pdg_mass(t.PdgCode()) >= 60);
+  }
+
+  // Apply shower cuts
+  static inline bool goodShower(const sim::MCShower& s, const simb::MCTruth& truth) {
+    return (tsutil::isFromNuVertex(truth, s) &&
+            s.Process() == "primary" &&
+            s.Start().E() - tsutil::get_pdg_mass(s.PdgCode()) >= 30);
+  }
+
+  // A structure used to hold TTree output
   struct OutputData {
+    OutputData() {
+      weights = NULL;
+    }
     double enu;
     double q2;
     double w;
@@ -67,9 +103,9 @@ public:
     int lpid;
     double bnbweight;
     int dataset;
-    std::map<std::string, std::vector<double> > weights;
+    std::map<std::string, std::vector<double> >* weights;
   };
-    
+
 protected:
   // Data product producers
   std::string _track_producer;
@@ -95,7 +131,6 @@ protected:
 
   TNtuple* _truthtree;
   TNtuple* _mectree;
-  TDatabasePDG* _pdgtable;
 
   TFile* _pdf_file;  //!< File containing dE/dx PDFs
   std::map<int, TH2F*> _trackdedxs;  // Track dE/dx distributions
@@ -103,5 +138,5 @@ protected:
 
 }  // namespace galleryfmwk
 
-#endif  // GALLERY_FMWK_SEL_H
+#endif  // GALLERY_FMWK_TSSELECTION_H
 
