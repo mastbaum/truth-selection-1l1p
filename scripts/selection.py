@@ -10,6 +10,7 @@ def process_files(outfile, dataset_id, files):
 
     # Set input root file
     for _f in glob(files):
+        if '19923235_241' in _f: continue
         my_proc.add_input_file(_f)
     
     # Set output ROOT file name

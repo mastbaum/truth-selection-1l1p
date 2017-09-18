@@ -126,9 +126,9 @@ bool TSSelection::analyze(gallery::Event* ev) {
   auto const& gtruth_list = \
     (*ev->getValidHandle<std::vector<simb::GTruth> >(gtruth_tag));
 
-  art::InputTag eventweight_tag(_ew_producer);
-  auto const& eventweights_list = \
-    (*ev->getValidHandle<std::vector<evwgh::MCEventWeight> >(eventweight_tag));
+  //art::InputTag eventweight_tag(_ew_producer);
+  //auto const& eventweights_list = \
+  //  (*ev->getValidHandle<std::vector<evwgh::MCEventWeight> >(eventweight_tag));
 
   art::InputTag mctruth_tag(_mct_producer);
   auto const& mctruth_list = \
@@ -145,14 +145,14 @@ bool TSSelection::analyze(gallery::Event* ev) {
   // Sanity checks
   assert(_fout);
   assert(mctruth_list.size() == gtruth_list.size());
-  assert(!eventweights_list.empty());
-  assert(eventweights_list[0].fWeight.find("bnbcorrection_FluxHist") !=
-         eventweights_list[0].fWeight.end() &&
-         eventweights_list[0].fWeight.at("bnbcorrection_FluxHist").size() == 1);
+  //assert(!eventweights_list.empty());
+  //assert(eventweights_list[0].fWeight.find("bnbcorrection_FluxHist") !=
+  //       eventweights_list[0].fWeight.end() &&
+  //       eventweights_list[0].fWeight.at("bnbcorrection_FluxHist").size() == 1);
 
   // BNB flux weight
-  double wbnb = \
-    eventweights_list[0].fWeight.at("bnbcorrection_FluxHist")[0];
+  double wbnb = 1.0;
+    //eventweights_list[0].fWeight.at("bnbcorrection_FluxHist")[0];
 
   _fout->cd();
 
@@ -316,8 +316,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
       const simb::MCParticle& plep = nu.Lepton();
       TLorentzVector xp = (pnu.Momentum() - plep.Momentum());
 
-      std::map<std::string, std::vector<double> > wgh = \
-        eventweights_list[0].fWeight;
+      std::map<std::string, std::vector<double> > wgh; //= 
+        //eventweights_list[0].fWeight;
 
       _data->enu = nu.Nu().E();
       _data->q2 = nu.QSqr();
