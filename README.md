@@ -64,8 +64,7 @@ and replace that file.
 This file contains common utilities used by the truth-based selection modules,
 which are in namespace `tsutil`.
 
-Scripts
--------
+### Scripts ###
 The `scripts` directory contains:
 
 * Python scripts used to run each module (see the Tools section)
@@ -75,4 +74,52 @@ The `scripts` directory contains:
 
 See header blocks at the top of each script for more information, including
 usage.
+
+Workflow
+--------
+The workflow begins with raw art ROOT files, produced by LArSoft (uboonecode).
+In practice we use two Monte Carlo samples: one fully inclusive BNB neutrino
+sample with MC cosmic ray overlays, and one with only nue events (to
+improve the statistics for nues, since they constitute only a small fraction
+of the BNB inclusive sample). Additionally, there are MC samples produced for
+various signal models.
+
+In general, MC weighting functions that assign weights based on variations in
+the systematics parameters are not run on the production MC files, so we
+must run them manually using grid-based LArSoft jobs that run the EventWeight
+module (and can also drop most data products, since this analysis only looks
+at MC truth). In this way we obtain copies of the MC datasets with only MC
+information, imbued with a set of systematics weights attached to each event.
+The POT counting script in `scripts/util/pot.py` can be used to extract the
+equivalent POT for these datasets, which is necessary for scaling to various
+exposures.
+
+The selection script (see TSSelection above) operates on a list of these
+weighted art ROOT files, applying the truth-based selection. Typically this
+would be run three times -- for the electron, inclusive, and signal samples --
+and produce three output files. The electron and inclusive samples can now be
+added together, using `scripts/util/add.C`. This (in contrast to `hadd`) takes
+CC nue and nuebar events from the electron sample and *everything else* from
+the inclusive sample. Splitting in this way simplifies the reweighting, as
+we combine samples representing different POT exposures. After the addition,
+we have two ROOT files -- a combined 1e1p + 1mu1p background file, and a signal
+file -- containing simple analysis ROOT trees.
+
+We can now run `scripts/cov.py` on the background ROOT file. This script will
+iterate through the chosen weights (the set of which comprise a systematics
+"universe") and produce a number of weighted spectra with and without
+systematic error bands, plus the covariance and correlation matrices. The
+script allows the user to toggle on and off different combinations of
+parameters, so that one can produce a covariance for e.g. the flux
+uncertainties alone, one particular GENIE uncertainty, or everything together.
+The `plotcov.py` script is provided for convenience, to draw these plots into
+reasonable-looking PDF files.
+
+The `scripts/analysis` directory provides some basic analysis code which
+operates on either the analysis tree files, or the histograms output from
+`cov.py` The main script, `chi2.py` reads in the latter and can make a
+variety of plots, and compute a chi^2 significance for observing the signal
+prediction under (background-only) null hypothesis using an analytic
+approximation or a Monte Carlo approach, which represents the final product
+of this analysis chain.
 
