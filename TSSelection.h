@@ -38,6 +38,8 @@ public:
     TLorentzVector p;
     double evis;
     double eccqe;
+    double len;
+    bool exiting;
 
     // Output stream operator to print a PIDParticle
     friend std::ostream& operator<<(std::ostream& os, const PIDParticle& dt);
@@ -87,6 +89,7 @@ public:
     OutputData() {
       weights = NULL;
     }
+    int nupdg;
     double enu;
     double q2;
     double w;
@@ -99,8 +102,12 @@ public:
     double ep;
     int ppdg;
     double elep;
+    double thetalep;
+    double philep;
     int lpdg;
     int lpid;
+    double llen;
+    bool lexit;
     double bnbweight;
     int dataset;
     std::map<std::string, std::vector<double> >* weights;

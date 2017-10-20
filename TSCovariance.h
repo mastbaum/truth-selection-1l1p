@@ -13,13 +13,14 @@ namespace galleryfmwk {
 class TSCovariance {
 public:
   TSCovariance();
-  virtual ~TSCovariance();
+  virtual ~TSCovariance() {}
 
   void SetInputFile(std::string _f) { fInputFile = _f; }
   void SetOutputFile(std::string _f) { fOutputFile = _f; }
   void AddWeight(std::string w);
   void SetScaleFactorE(double _sf) { fScaleFactorE = _sf; }
   void SetScaleFactorMu(double _sf) { fScaleFactorMu = _sf; }
+  void SetSeed(int _seed) { fSeed = _seed; }
   int WriteSystPlots(char* filename);
 
   void init();
@@ -97,8 +98,7 @@ private:
   TFile* fFile;  //!< File for output
   double fScaleFactorE;  //!< POT scaling, etc.
   double fScaleFactorMu;  //!< POT scaling, etc.
-
-  std::ofstream ofs;
+  int fSeed;  //!< Random seed for ROOT
 };
 
 }  // namespace galleryfmwk

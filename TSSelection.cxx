@@ -95,6 +95,7 @@ bool TSSelection::initialize() {
 
   _data = new OutputData;
   _tree = new TTree("data", "");
+  _tree->Branch("nupdg", &_data->nupdg);
   _tree->Branch("enu", &_data->enu);
   _tree->Branch("q2", &_data->q2);
   _tree->Branch("w", &_data->w);
@@ -107,8 +108,12 @@ bool TSSelection::initialize() {
   _tree->Branch("ep", &_data->ep);
   _tree->Branch("ppdg", &_data->ppdg);
   _tree->Branch("elep", &_data->elep);
+  _tree->Branch("thetalep", &_data->thetalep);
+  _tree->Branch("philep", &_data->philep);
   _tree->Branch("lpdg", &_data->lpdg);
   _tree->Branch("lpid", &_data->lpid);
+  _tree->Branch("llen", &_data->llen);
+  _tree->Branch("lexit", &_data->lexit);
   _tree->Branch("bnbweight", &_data->bnbweight);
   _tree->Branch("dataset", &_data->dataset);
   _tree->Branch("weights", &_data->weights);
@@ -126,9 +131,9 @@ bool TSSelection::analyze(gallery::Event* ev) {
   auto const& gtruth_list = \
     (*ev->getValidHandle<std::vector<simb::GTruth> >(gtruth_tag));
 
-  //art::InputTag eventweight_tag(_ew_producer);
-  //auto const& eventweights_list = \
-  //  (*ev->getValidHandle<std::vector<evwgh::MCEventWeight> >(eventweight_tag));
+  art::InputTag eventweight_tag(_ew_producer);
+  auto const& eventweights_list = \
+    (*ev->getValidHandle<std::vector<evwgh::MCEventWeight> >(eventweight_tag));
 
   art::InputTag mctruth_tag(_mct_producer);
   auto const& mctruth_list = \
@@ -145,14 +150,13 @@ bool TSSelection::analyze(gallery::Event* ev) {
   // Sanity checks
   assert(_fout);
   assert(mctruth_list.size() == gtruth_list.size());
-  //assert(!eventweights_list.empty());
-  //assert(eventweights_list[0].fWeight.find("bnbcorrection_FluxHist") !=
-  //       eventweights_list[0].fWeight.end() &&
-  //       eventweights_list[0].fWeight.at("bnbcorrection_FluxHist").size() == 1);
 
   // BNB flux weight
   double wbnb = 1.0;
-    //eventweights_list[0].fWeight.at("bnbcorrection_FluxHist")[0];
+  if (!eventweights_list.empty() &&
+      eventweights_list[0].fWeight.find("bnbcorrection_FluxHist") != eventweights_list[0].fWeight.end()) {
+    wbnb = eventweights_list[0].fWeight.at("bnbcorrection_FluxHist")[0];
+  }
 
   _fout->cd();
 
@@ -163,8 +167,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
 
     size_t ntracks = 0, nshowers = 0;
 
-    // Keep track of event particle content. Currently a little redundant, but
-    // will be more useful with efficiency/smearing included.
+    // Keep track of event particle content (currently a little redundant)
     std::vector<PIDParticle> particles_found;
     std::vector<PIDParticle> particles_true;
 
@@ -177,12 +180,22 @@ bool TSSelection::analyze(gallery::Event* ev) {
         continue;
       }
 
+      // Track length
+      double s = 0;
+      TLorentzVector pos = mct.End().Position();
+      for (long k=mct.size()-2; k>=0; k--) {
+        s += (pos.Vect() - mct[k].Position().Vect()).Mag();
+        pos = mct[k].Position();
+      }
+
       particles_true.push_back({
         mct.PdgCode(),
         mct.PdgCode(),
         mct.Start().Momentum(),
         mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()),
-        tsutil::eccqe(mct.Start().Momentum())
+        tsutil::eccqe(mct.Start().Momentum()),
+        s,
+        !tsutil::inFV(mct)
       });
 
       ntracks++;
@@ -205,13 +218,6 @@ bool TSSelection::analyze(gallery::Event* ev) {
       delete htemp;
 
       // Un-PID "protons" that are too long or short
-      double s = 0;
-      TLorentzVector pos = mct.End().Position();
-      for (long k=mct.size()-2; k>=0; k--) {
-        s += (pos.Vect() - mct[k].Position().Vect()).Mag();
-        pos = mct[k].Position();
-      }
-
       if (pdg_best == 2212 && (s > 80 || s < 12)) {
         pdg_best = -888;
       }
@@ -226,7 +232,9 @@ bool TSSelection::analyze(gallery::Event* ev) {
         mct.PdgCode(),
         mct.Start().Momentum(),
         mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()),
-        tsutil::eccqe(mct.Start().Momentum())
+        tsutil::eccqe(mct.Start().Momentum()),
+        s,
+        !tsutil::inFV(mct)
       });
     }
 
@@ -245,7 +253,9 @@ bool TSSelection::analyze(gallery::Event* ev) {
         mcs.PdgCode(),
         mcs.Start().Momentum(),
         mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode()),
-        tsutil::eccqe(mcs.Start().Momentum())
+        tsutil::eccqe(mcs.Start().Momentum()),
+        -1,
+        !tsutil::inFV(mcs)
       });
 
       nshowers++;
@@ -258,7 +268,9 @@ bool TSSelection::analyze(gallery::Event* ev) {
         mcs.PdgCode(),
         mcs.Start().Momentum(),
         mcs.Start().E(),
-        tsutil::eccqe(mcs.Start().Momentum())
+        tsutil::eccqe(mcs.Start().Momentum()),
+        -1,
+        !tsutil::inFV(mcs)
       });
     }
 
@@ -269,6 +281,22 @@ bool TSSelection::analyze(gallery::Event* ev) {
     bool t_1e1p = is1l1p(particles_true, 11);
     bool f_1m1p = is1l1p(particles_found, 13);
     bool t_1m1p = is1l1p(particles_true, 13);
+
+    // Where have all the muons gone?
+    //if (t_1m1p && !f_1m1p) {
+    //  std::cout << "1m1p missed" << std::endl;
+    //  std::cout << "true: n=" << particles_true.size() << ": ";
+    //  for (size_t i=0; i<particles_true.size(); i++) {
+    //    std::cout << particles_true[i].pdg << "/" << particles_true[i].pdgtrue << "(" << particles_true[i].evis << ") ";
+    //  }
+    //  std::cout << std::endl;
+
+    //  std::cout << "found: n=" << particles_found.size() << ": ";
+    //  for (size_t i=0; i<particles_found.size(); i++) {
+    //    std::cout << particles_found[i].pdg << "/" << particles_found[i].pdgtrue << "(" << particles_found[i].evis << ") ";
+    //  }
+    //  std::cout << std::endl;
+    //}
 
     if (t_1e1p) true_1e1p++;
     if (f_1e1p && t_1e1p) good_1e1p++;
@@ -296,7 +324,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
 
     // Write event to output tree for found 1l1p events
     if (f_1e1p || f_1m1p) {
-      double eccqe=-1, ep=-1, ppdg=-1, elep=-1, lpdg=-1, lpid=-1;
+      double eccqe=-1, ep=-1, ppdg=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
 
       for (size_t k=0; k<particles_found.size(); k++) {
         if (particles_found[k].pdg == 2212) {
@@ -306,8 +334,12 @@ bool TSSelection::analyze(gallery::Event* ev) {
         else {
           eccqe = particles_found[k].eccqe;
           elep = particles_found[k].evis;
+          thetalep = particles_found[k].p.Theta();
+          philep = particles_found[k].p.Phi();
           lpid = particles_found[k].pdg;
           lpdg = particles_found[k].pdgtrue;
+          llen = particles_found[k].len;
+          lexit = particles_found[k].exiting;
         }
       }
 
@@ -316,9 +348,12 @@ bool TSSelection::analyze(gallery::Event* ev) {
       const simb::MCParticle& plep = nu.Lepton();
       TLorentzVector xp = (pnu.Momentum() - plep.Momentum());
 
-      std::map<std::string, std::vector<double> > wgh; //= 
-        //eventweights_list[0].fWeight;
+      std::map<std::string, std::vector<double> > wgh;
+      if (!eventweights_list.empty()) {
+        wgh = eventweights_list[0].fWeight;
+      }
 
+      _data->nupdg = nu.Nu().PdgCode();
       _data->enu = nu.Nu().E();
       _data->q2 = nu.QSqr();
       _data->w = nu.W();
@@ -331,8 +366,12 @@ bool TSSelection::analyze(gallery::Event* ev) {
       _data->ep = ep;
       _data->ppdg = ppdg;
       _data->elep = elep;
+      _data->thetalep = thetalep;
+      _data->philep = philep;
       _data->lpdg = lpdg;
       _data->lpid = lpid;
+      _data->llen = llen;
+      _data->lexit = lexit;
       _data->bnbweight = wbnb;
       _data->dataset = _dataset_id;
       _data->weights = &wgh;
