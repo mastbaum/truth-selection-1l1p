@@ -1,3 +1,14 @@
+'''Make dE/dx PDFs for the truth-based selection.
+
+Usage:
+
+  $ python make_pdfs.py "files*.root"
+
+The input is a set of art ROOT files.
+
+A. Mastbaum <mastbaum@uchicago.edu>, 2017/09
+'''
+
 import sys
 from glob import glob
 from ROOT import galleryfmwk
@@ -8,6 +19,7 @@ def process_files(files):
 
     # Set input root file
     for _f in glob(files):
+        # May check here if files open correctly
         my_proc.add_input_file(_f)
     
     # Set output ROOT file name

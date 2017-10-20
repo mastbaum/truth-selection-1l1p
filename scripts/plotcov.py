@@ -1,11 +1,25 @@
-import sys
-from glob import glob
+'''Produce plots of covariances.
+
+Makes PDF format plots from the output of `cov.py` (files which contain
+covariance matrices and spectra with error bands).
+
+Usage:
+
+  $ python plotcov.py
+
+This script should be modified to use the desired combinations of
+systematic parameters, and the input filenames.
+
+A. Mastbaum <mastbaum@uchicago.edu>, 2017/09
+'''
+
 import ROOT
 import numpy as np
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptStat(0)
 
+# Names of the systematics to plot
 wnames = [
     #'expskin_FluxUnisim',
     #'genie_AGKYpT_Genie',
@@ -93,6 +107,7 @@ for w in wnames:
     fcov = cov.Clone('fcov')
     fcov.Reset()
     hg = f.Get('hg')
+
     g = []
     diag = []
     for i in range(0, hg.GetNbinsX()):
@@ -103,6 +118,7 @@ for w in wnames:
             print('%i %i %f %f' % (i, j, d, cov.GetBinContent(i,j)))
             if d > 1e-5:
                 fcov.SetBinContent(i, j, cov.GetBinContent(i, j) / d)
+
     fcov.Draw('colz')
     c1.SetRightMargin(0.18)
     c1.SaveAs('figures/fcov_%s.pdf' % w)

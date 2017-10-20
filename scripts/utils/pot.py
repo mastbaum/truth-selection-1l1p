@@ -1,11 +1,18 @@
-# Create and print out a list of POT for each file in the input.
-#
-# You can then trim this and add the lines together with something
-# like np.sum(np.loadtxt(file.txt)). Somehow just getting the
-# totgoodpot branch inside ROOT doesn't work at all.
-#
-# A. Mastbaum <mastbaum@uchicago.edu>, 2017/09/07
-#
+'''Create and print out a list of POT for each file in the input.
+
+You can then trim this and add the lines together with something
+like np.sum(np.loadtxt(file.txt)). This is a workaround since
+somehow just getting the totgoodpot branch inside ROOT doesn't
+work at all.
+
+Usage:
+
+  $ python pot.py "files*.root"
+
+The input is a set of art ROOT files.
+
+A. Mastbaum <mastbaum@uchicago.edu>, 2017/09/07
+'''
 
 import sys
 import ROOT

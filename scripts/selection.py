@@ -1,3 +1,8 @@
+'''Run the truth-based selection.
+
+A. Mastbaum <mastbaum@uchicago.edu>, 2017/09
+'''
+
 import sys
 from glob import glob
 from ROOT import galleryfmwk
@@ -10,7 +15,7 @@ def process_files(outfile, dataset_id, files):
 
     # Set input root file
     for _f in glob(files):
-        if '19923235_241' in _f: continue
+        # May check here if files open correctly
         my_proc.add_input_file(_f)
     
     # Set output ROOT file name
