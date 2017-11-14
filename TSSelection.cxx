@@ -29,26 +29,38 @@
 #include "TSSelection.h"
 
 namespace galleryfmwk {
-void TSSelection::setShowerEnergyResolution(float res) {
+void TSSelection::setShowerEnergyResolution(float res, bool by_percent) {
   _shower_energy_resolution = res;
+  _shower_energy_by_percent = by_percent;
   _shower_energy_distribution = std::normal_distribution<float>(0., res);
 }
 
-void TSSelection::setTrackEnergyResolution(float res) {
+void TSSelection::setTrackEnergyResolution(float res, bool by_percent) {
   _track_energy_resolution = res;
+  _track_energy_by_percent = by_percent;
   _track_energy_distribution = std::normal_distribution<float>(0., res);
 }
 
-float TSSelection::nextTrackEnergyDistortion() {
+float TSSelection::nextTrackEnergyDistortion(float this_energy=0.) {
   if (_track_energy_resolution < 1e-4)
     return 0.;
-  return _track_energy_distribution( _gen );
+  if (_track_energy_by_percent) {
+    return _track_energy_distribution( _gen ) * this_energy; 
+  } 
+  else {
+    return _track_energy_distribution( _gen );
+  }
 }
 
-float TSSelection::nextShowerEnergyDistortion() {
+float TSSelection::nextShowerEnergyDistortion(float this_energy=0.) {
   if (_shower_energy_resolution < 1e-4)
     return 0.;
-  return _shower_energy_distribution( _gen );
+  if (_shower_energy_by_percent) {
+    return _shower_energy_distribution( _gen) * this_energy;
+  }
+  else {
+    return _shower_energy_distribution( _gen );
+  }
 }
 
 bool TSSelection::is1l1p(std::vector<PIDParticle>& p, int lpdg) {
@@ -209,7 +221,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
     for (size_t j=0; j<mctrack_list.size(); j++) {
       const sim::MCTrack& mct = mctrack_list.at(j);
 
-      float energy_distortion = nextTrackEnergyDistortion();
+      float this_energy = mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode());
+      float energy_distortion = nextTrackEnergyDistortion( this_energy );
 
       // Apply track cuts
       if (!goodTrack(mct, mctruth, energy_distortion)) {
@@ -280,7 +293,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
     for (size_t j=0; j<mcshower_list.size(); j++) {
       const sim::MCShower& mcs = mcshower_list.at(j);
 
-      float energy_distortion = nextShowerEnergyDistortion();
+      float this_energy = mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode());
+      float energy_distortion = nextShowerEnergyDistortion( this_energy );
 
       // Apply shower cuts
       if (!goodShower(mcs, mctruth, energy_distortion)) {
