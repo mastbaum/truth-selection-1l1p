@@ -17,7 +17,8 @@
  * A. Mastbaum <mastbaum@uchicago.edu>, 2017/09/08
  */
 
-{
+void add(TString f_ccnue, TString f_bnb, TString f_out) {
+/*
   // CCnue input
   TString f_ccnue = "../sel_ccnue_take2.root";
 
@@ -26,7 +27,7 @@
 
   // Output
   TString f_out = "sel_merged_mcc8.root";
-
+*/
 
   // Read in the input files
   TFile* fe = TFile::Open(f_ccnue);
