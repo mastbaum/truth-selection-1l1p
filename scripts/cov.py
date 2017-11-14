@@ -18,6 +18,7 @@ A. Mastbaum <mastbaum@uchicago.edu>, 2017/09
 '''
 
 import sys
+import argparse
 from glob import glob
 from ROOT import galleryfmwk
 
@@ -85,6 +86,12 @@ wg = {
     ],
 }
 
+parser = argparse.ArgumentParser("Scale input files and produce covariances")
+parser.add_argument("input_file")
+parser.add_argument("-d", "--directory", default=".")
+parser.add_argument("-s", "--signal", action="store_true")
+args = parser.parse_args()
+
 # A group with all parameters varied
 wg['all'] = []
 for v in wg.values():
@@ -101,12 +108,12 @@ sfs = 5.0e19 / 1.86828e+21  # Signal sample
 for w, ws in wg.items():
     print w
     m = galleryfmwk.TSCovariance()
-    m.SetInputFile(sys.argv[1])
+    m.SetInputFile(args.input_file)
     m.SetScaleFactorE(sfe)
     m.SetScaleFactorMu(sfm)
     for ww in ws:
         m.AddWeight(ww)
-    m.SetOutputFile('cov_%s.root' % w)
+    m.SetOutputFile(args.directory + '/cov_%s.root' % w)
     m.init()
     m.analyze()
     del m
@@ -119,7 +126,7 @@ for w in wg['all']:
     m.SetScaleFactorE(sfe)
     m.SetScaleFactorMu(sfm)
     m.AddWeight(w)
-    m.SetOutputFile('cov_%s.root' % w)
+    m.SetOutputFile(args.directory + '/cov_%s.root' % w)
     m.init()
     m.analyze()
     del m
