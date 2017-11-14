@@ -64,10 +64,10 @@ public:
   void setMCShowerProducer(std::string s) { _mcshw_producer = s; }
   void setMCTrackProducer(std::string s) { _mctrk_producer = s; }
 
-  void setShowerEnergyResolution(float);
-  void setTrackEnergyResolution(float);
-  float nextShowerEnergyDistortion();
-  float nextTrackEnergyDistortion();
+  void setShowerEnergyResolution(float, bool);
+  void setTrackEnergyResolution(float, bool);
+  float nextShowerEnergyDistortion(float);
+  float nextTrackEnergyDistortion(float);
 
   // Set a numeric dataset ID, which is written into the tree as a tag
   void setDatasetID(int id) { _dataset_id = id; }
@@ -139,8 +139,10 @@ protected:
 
   // Optionally set some energy resolution
   float _shower_energy_resolution;
+  bool _shower_energy_by_percent;
   std::normal_distribution<float> _shower_energy_distribution;
   float _track_energy_resolution;
+  bool _track_energy_by_percent;
   std::normal_distribution<float> _track_energy_distribution;
   // random stuff
   std::mt19937 _gen;
