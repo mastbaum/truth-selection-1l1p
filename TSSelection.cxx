@@ -128,6 +128,8 @@ bool TSSelection::initialize() {
   // initialize resolutions to 0 (perfect resolution)
   _shower_energy_resolution = 0.;
   _track_energy_resolution = 0.;
+  _shower_energy_by_percent = false;
+  _track_energy_by_percent = false;
   _shower_energy_distribution = std::normal_distribution<float>(0.0, 0.0);
   _track_energy_distribution = std::normal_distribution<float>(0.0, 0.0);
 
