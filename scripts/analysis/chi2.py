@@ -418,9 +418,12 @@ def plot_bin_errors(emx, em, eex, ee, ess, fcov,
 
 
 if __name__ == '__main__':
+
+    # argv1: merged background output from cov.py
+    # argv2: merged signal output from cov.py 
     # Load data from files
     enu_mx, enu_m, enu_ex, enu_e, enu_s, enu_ss, cov = \
-        load('cov_merged/cov_all.root', 'cov_sig_2/cov_all.root')
+        load(sys.argv[1] + '/cov_all.root', sys.argv[2] + '/cov_all.root')
 
     eb = np.hstack((enu_m, enu_e))
     fcov = cov / np.einsum('i,j', eb, eb)
@@ -592,7 +595,7 @@ if __name__ == '__main__':
 
         for w in reversed(wnames):
             enu_mx, enu_m, enu_ex, enu_e, enu_s, enu_ss, cov = \
-                load('cov_em_2/cov_%s.root' % w, 'cov_sig_2/cov_%s.root' % w)
+                load(sys.argv[1] + ('/cov_%s.root' % w), sys.argv[2] + ('/cov_%s.root' % w))  
 
             eb = np.hstack((enu_m, enu_e))
             fcov = cov / np.einsum('i,j', eb, eb)
