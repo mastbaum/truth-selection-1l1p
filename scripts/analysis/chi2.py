@@ -13,7 +13,18 @@ import sys
 import numpy as np
 from numpy.core.umath_tests import inner1d
 import scipy.stats
+
+from matplotlib import rc
+import os
+os.environ['PATH'] = os.environ['PATH'] + ':/Library/TeX/texbin'
+rc('text', usetex=True)
+import matplotlib
 from matplotlib import pyplot as plt
+matplotlib.rcParams['xtick.labelsize'] = 16
+matplotlib.rcParams['ytick.labelsize'] = 16
+matplotlib.rcParams['axes.titlesize'] = 16
+matplotlib.rcParams['axes.labelsize'] = 16
+matplotlib.rcParams['legend.fontsize'] = 12
 
 def mc_chi2(data, exp, cov, n=250000, n2=0, plot=False):
     '''Calculate a p-value with a Monte Carlo using a chi2-like statistic.
@@ -140,8 +151,9 @@ def load(em_file, signal_file):
             cov[i][j] = hcov.GetBinContent(i, j)
 
     # Select desired bins and recompute the covariances
-    gmbins = np.arange(3, 17)
-    gebins = np.arange(1, len(ee)-1)
+    #gmbins = np.arange(3, 17)
+    gmbins = np.arange(2, 20)
+    gebins = np.arange(1, len(ee)-2)
 
     fcov = cov / np.einsum('i,j', eb, eb)
     good = np.hstack((gmbins, len(mbins)+gebins))
@@ -180,14 +192,19 @@ def significance(em, ee, es, fcov,
     :param eff_e: 1e1p efficiency
     :returns: Significance of the excess, as (p-value, sigma)
     '''
-    sf = pot / 5e19
+    sfb = pot / 6.6e20
+    sfs = pot / 5e19
 
     # Rescaled efficienies. Magic numbers are the actual selection efficiency
     # (reported by the truth selection code).
-    em = em * sf * eff_m / 0.382086
-    ee = ee * sf * eff_e / 0.854848
-    es = es * sf * eff_e / 0.854848
+    em = em * sfb * eff_m / 0.382086
+    ee = ee * sfb * eff_e / 0.854848
+    es = es * sfs * eff_e / 0.854848
     eb = np.hstack((em, ee))
+
+    #print(np.sum(em))
+    #print(np.sum(ee))
+    #print(np.sum(es))
 
     if syst:
         covr = fcov * np.einsum('i,j', eb, eb) + np.diag(eb)
@@ -195,7 +212,7 @@ def significance(em, ee, es, fcov,
         covr = np.diag(eb)
 
     if mc:
-        return mc_chi2(eb+es, eb, covr, n=100000000, n2=1000)
+        return mc_chi2(eb+es, eb, covr, n=1000000, n2=1000)
 
     else:
         means = np.random.multivariate_normal(eb, covr-np.diag(eb), size=100000)
@@ -228,15 +245,21 @@ def plot_sigma_v_pot(em, ee, es, fcov,
     return plot
 
 
-def plot_cor(cov, outfile='corr.pdf'):
+def plot_cor(cov, em, outfile='corr.pdf'):
     '''Plot the correlation matrix.
 
     :param cov: Covariance matrix
     '''
     cor = cov / np.sqrt(np.einsum('ii,jj->ij', cov, cov))
-    plt.matshow(cor, interpolation='nearest', origin='lower', cmap='jet')
+    f, ax = plt.subplots()
+    m = ax.matshow(cor, interpolation='nearest', origin='lower', cmap='inferno')
     plt.gca().xaxis.tick_bottom()
-    plt.colorbar()
+    f.colorbar(m)
+    ax.set_xlabel('Energy bin index ($\\nu_\\mu,\\nu_e$)')
+    ax.set_ylabel('Energy bin index ($\\nu_\\mu,\\nu_e$)')
+    ax.axhline(len(em)-0.5, lw=2, color='black')
+    ax.axvline(len(em)-0.5, lw=2, color='black')
+    plt.tight_layout()
     if outfile:
         plt.savefig(outfile)
     plt.show()
@@ -249,11 +272,12 @@ def plot_spectra(emx, em, eex, ee, ess, fcov, pot=5e19, eff_m=0.3, eff_e=0.3):
     :param eff_m: 1m1p efficiency
     :param eff_e: 1e1p efficiency
     '''
-    sf = pot / 5e19
+    sfb = pot / 6.6e20
+    sfs = pot / 5e19
 
-    em =  em * sf * eff_m / 0.382086
-    ee =  ee * sf * eff_e / 0.854848
-    es = ess * sf * eff_e / 0.854848
+    em =  em * sfb * eff_m / 0.382086
+    ee =  ee * sfb * eff_e / 0.854848
+    es = ess * sfs * eff_e / 0.854848
     eb = np.hstack((em, ee))
 
     covr = fcov * np.einsum('i,j', eb, eb) #+ np.diag(eb)
@@ -262,15 +286,22 @@ def plot_spectra(emx, em, eex, ee, ess, fcov, pot=5e19, eff_m=0.3, eff_e=0.3):
 
     # 1mu1p
     poisi = np.array(scipy.stats.poisson.interval(mu=em, alpha=0.682))
-    stat = [em - poisi[0], poisi[1] - em]
+    stat = np.array([em - poisi[0], poisi[1] - em])
     syst = np.sqrt(np.diag(covr[:len(emx),:len(emx)]))
     tot  = [np.sqrt(np.square(stat[0]) + np.square(syst)),
             np.sqrt(np.square(stat[1]) + np.square(syst))]
+
+    #ax1.bar(emx, tot[1]+tot[0], bottom=em-tot[0]/2, width=np.diff(emx)[0],
+    #        color=plt.cm.Paired(4), label='Total')
+    #ax1.bar(emx, stat[1]+stat[0], bottom=em-stat[0]/2, width=np.diff(emx)[0],
+    #        color=plt.cm.Paired(5), label='Stat. only')
+
     ax1.bar(emx, em, width=np.diff(emx)[0], color='gray', label='$1\mu1p$')
     ax1.errorbar(emx, em, stat, fmt=',',
                  color='black', capsize=3, label='Error (stat)')
     ax1.errorbar(emx, em, tot,
                  fmt=',', color='black', label='Error (total)')
+
     #ax1.errorbar(emx, em,
     #             np.sqrt(np.diag((covr+np.diag(eb))[:len(emx),:len(emx)])),
     #             fmt=',', color='red', label='Error (total)')
@@ -286,9 +317,12 @@ def plot_spectra(emx, em, eex, ee, ess, fcov, pot=5e19, eff_m=0.3, eff_e=0.3):
     syst = np.sqrt(np.diag(covr[len(emx):,len(emx):]))
     tot  = [np.sqrt(np.square(stat[0]) + np.square(syst)),
             np.sqrt(np.square(stat[1]) + np.square(syst))]
-    print(stat)
-    print(syst)
-    print(tot)
+
+    #ax2.plot(eex[es>0], (ee+es)[es>0], 'o', color='black', label='Signal')
+    #ax2.bar(eex, tot[1]+tot[0], bottom=ee-tot[0]/2, width=np.diff(eex)[0],
+    #        color=plt.cm.Paired(4), label='Total')
+    #ax2.bar(eex, stat[1]+stat[0], bottom=ee-stat[0]/2, width=np.diff(eex)[0],
+    #        color=plt.cm.Paired(5), label='Stat. only')
 
     ax2.bar(eex, ee+es, width=np.diff(eex)[0], color='darkred', label='Signal')
     ax2.bar(eex, ee, width=np.diff(eex)[0], color='gray', label='$1e1p$')
@@ -296,6 +330,7 @@ def plot_spectra(emx, em, eex, ee, ess, fcov, pot=5e19, eff_m=0.3, eff_e=0.3):
                  color='black', capsize=3, label='Error (stat)')
     ax2.errorbar(eex, ee, tot,
                  fmt=',', color='black', label='Error (total)')
+
     #ax2.errorbar(eex, ee,
     #             np.sqrt(np.diag((covr+np.diag(eb))[len(emx):,len(emx):])),
     #             fmt=',', color='red', label='Error (total)', capsize=3)
@@ -308,6 +343,7 @@ def plot_spectra(emx, em, eex, ee, ess, fcov, pot=5e19, eff_m=0.3, eff_e=0.3):
     ax2.set_ylim(0, 1.1 * np.max(ee+es))
     ax2.legend(loc='upper right')
     
+    plt.tight_layout()
     plt.show()
 
 
@@ -317,8 +353,8 @@ def plot_sigma_v_eff(em, ee, es, fcov, pot=5e19, mc=False):
     :param pot: Exposure (POT)
     :param mc: Calculate the p-value with a Monte Carlo
     '''
-    eeffs = np.arange(0.1, 0.31, 0.05)
-    meffs = np.linspace(0.0001, 0.01, 10)
+    eeffs = np.arange(0.1, 0.36, 0.05)
+    meffs = np.linspace(0.0001, 0.05, 10)
     see = np.empty(shape=(len(eeffs), len(meffs)), dtype=np.float32)
 
     for i, effm in enumerate(meffs):
@@ -328,15 +364,18 @@ def plot_sigma_v_eff(em, ee, es, fcov, pot=5e19, mc=False):
             print('m %1.2f / e %1.2f: %f' % (effm, effe, sigma))
             see[j][i] = sigma
 
+    fig, ax = plt.subplots()
+
     xlo1, xhi1 = meffs[0], meffs[-1] + np.diff(meffs)[0]
     xlo2, xhi2 = eeffs[0], eeffs[-1] + np.diff(eeffs)[0]
-    plt.matshow(see, interpolation='nearest', origin='lower',
+    m = ax.matshow(see, interpolation='nearest', origin='lower',
                 cmap='jet', extent=(xlo1, xhi1, xlo2, xhi2), aspect='auto')
     plt.gca().xaxis.tick_bottom()
-    plt.xlabel('$1\\mu1p$ efficiency')
-    plt.ylabel('$1e1p$ efficiency')
-    cb = plt.colorbar()
+    ax.set_xlabel('$1\\mu1p$ efficiency')
+    ax.set_ylabel('$1e1p$ efficiency')
+    cb = fig.colorbar(m)
     cb.set_label('Significance ($\sigma$)')
+    plt.tight_layout()
     plt.show()
 
 
@@ -347,7 +386,7 @@ def constrain_nue(emx, em, eex, ee, ess, fcov, pot=5e19, eff_m=0.3, eff_e=0.3):
     This doesn't seem to be working right, statistically. The nue constraint
     for small numu statistics seems too good.
     '''
-    sf = pot / 5e19
+    sf = pot / 6.6e20
     ee =  ee * sf * eff_e / 0.854848
 
     # Unconstrained 1e1p errors
@@ -366,7 +405,7 @@ def constrain_nue(emx, em, eex, ee, ess, fcov, pot=5e19, eff_m=0.3, eff_e=0.3):
         icov = np.linalg.inv(covr)
 
         # Total number of mu events in some range
-        print('N 1mu1p 200<Eqe<1600 MeV: %f',
+        print('N 1mu1p 200<Eqe<1600 MeV: %f' %
               np.sum(emr[(emx>200)&(emx<1600)]))
 
         # The constraint, a la MiniBooNE (Alexis's thesis)
@@ -391,9 +430,9 @@ def constrain_nue(emx, em, eex, ee, ess, fcov, pot=5e19, eff_m=0.3, eff_e=0.3):
 def plot_bin_errors(emx, em, eex, ee, ess, fcov,
                     pot=5e19, eff_m=0.3, eff_e=0.3):
     '''Plot the (unconstrained) bin errors.'''
-    sf = pot / 5e19
-    ee =  ee * sf * eff_e / 0.854848
-    em =  em * sf * eff_m / 0.382086
+    sfb = pot / 5e19
+    ee =  ee * sfb * eff_e / 0.854848
+    em =  em * sfb * eff_m / 0.382086
     eb = np.hstack((em, ee))
     covr = fcov * np.einsum('i,j', eb, eb)
 
@@ -406,7 +445,7 @@ def plot_bin_errors(emx, em, eex, ee, ess, fcov,
     ax2.errorbar(emx, np.zeros_like(emx),
                  np.sqrt(np.diag(covr))[:len(em)] / em,
                  fmt=',', ls='-', color='black', label='$1\mu1p$')
-    ax2.set_ylabel('Fractional systematic uncertainty, %1.1e POT' % pot)
+    ax2.set_ylabel('Fractional systematic uncertainty') #, %1.1e POT' % pot)
 
     for ax in [ax1, ax2]:
         ax.set_xlabel('$E_\\nu^\mathrm{CCQE}$ (MeV)')
@@ -414,13 +453,17 @@ def plot_bin_errors(emx, em, eex, ee, ess, fcov,
         ax.axes.yaxis.grid(which='major')
         ax.legend(loc='upper left')
 
+    plt.tight_layout()
     plt.show()
 
 
 if __name__ == '__main__':
     # Load data from files
+    #enu_mx, enu_m, enu_ex, enu_e, enu_s, enu_ss, cov = \
+    #    load('cov_merged/cov_all.root', 'cov_sig_2/cov_all.root')
     enu_mx, enu_m, enu_ex, enu_e, enu_s, enu_ss, cov = \
-        load('cov_merged/cov_all.root', 'cov_sig_2/cov_all.root')
+        load('/Volumes/Storage/sbn/lee/truth_sel/cov_mcc8/cov_all.root',
+             '/Volumes/Storage/sbn/lee/truth_sel/cov_signal_new/cov_all.root')
 
     eb = np.hstack((enu_m, enu_e))
     fcov = cov / np.einsum('i,j', eb, eb)
@@ -429,12 +472,13 @@ if __name__ == '__main__':
     do_sigma_pot_plot = False
     if do_sigma_pot_plot:
         #pots = np.linspace(5e19, 6.6e20, 3)
-        pots = np.linspace(5e19, 6.8e20, 10)
-        p1 = plot_sigma_v_pot(enu_m, enu_e, enu_s, fcov, pots, mc=True)[0]
+        pots = np.linspace(5e19, 6.6e20, 10)
+        p1 = plot_sigma_v_pot(enu_m, enu_e, enu_s, fcov, pots, mc=False)[0]
         p1.set_label('Stat+Syst')
-        p2 = plot_sigma_v_pot(enu_m, enu_e, enu_s, fcov, pots, mc=True, syst=False)[0]
+        p2 = plot_sigma_v_pot(enu_m, enu_e, enu_s, fcov, pots, mc=False, syst=False)[0]
         p2.set_label('Stat Only')
         plt.legend(loc='best')
+        plt.axhline(5.0, ls='--', lw=1, color='black', label='$5\\sigma$')
         plt.savefig('sigma_v_pot.pdf')
         plt.show()
 
@@ -481,20 +525,22 @@ if __name__ == '__main__':
         #       pot=5e19, syst=False, mc=True, eff_m=0.3, eff_e=0.3))
 
     # Draw the total correlation matrix
-    draw_cor = False
+    draw_cor = True
     if draw_cor:
-        plot_cor(cov)
+        plot_cor(cov, enu_m)
 
     do_constrain_nue = False
     if do_constrain_nue:
         constrain_nue(enu_mx, enu_m, enu_ex, enu_e, enu_ss, fcov,
                       pot=6.6e20, eff_e=0.3)
 
-    plot_bin_errors(enu_mx, enu_m, enu_ex, enu_e, enu_ss, fcov,
-                  pot=6.6e20, eff_e=0.3)
+    do_plot_bin_errors = True#False
+    if do_plot_bin_errors:
+        plot_bin_errors(enu_mx, enu_m, enu_ex, enu_e, enu_ss, fcov,
+                      pot=6.6e20, eff_e=0.3)
 
     # Draw the signal and background spectra
-    draw_spectra = False
+    draw_spectra = True
     if draw_spectra:
         #pot=1e21
         #e_eff = 0.3

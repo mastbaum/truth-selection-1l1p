@@ -79,29 +79,30 @@ wnames = [
     'flux',
     'xsr',
     'all',
+    'rpa',
 ]
 
 for w in wnames:
-    print w
-    f = ROOT.TFile('cov_em/cov_%s.root' % w)
+    print(w)
+    f = ROOT.TFile('cov_mcc8/cov_%s.root' % w)
     c1 = ROOT.TCanvas()
 
     he = f.Get('err_nue')
     he.SetFillColor(ROOT.kRed-7)
     he.SetTitle(';CCQE Energy (MeV);Events')
     he.Draw('a2')
-    c1.SaveAs('figures/nue_%s.pdf' % w)
+    c1.SaveAs('cov_mcc8/figures/nue_%s.pdf' % w)
 
     hm = f.Get('err_numu')
     hm.SetFillColor(ROOT.kRed-7)
     hm.SetTitle(';CCQE Energy (MeV);Events')
     hm.Draw('a2')
-    c1.SaveAs('figures/num_%s.pdf' % w)
+    c1.SaveAs('cov_mcc8/figures/num_%s.pdf' % w)
 
     cor = f.Get('cor')
     cor.Draw('colz')
     c1.SetRightMargin(0.18)
-    c1.SaveAs('figures/cor_%s.pdf' % w)
+    c1.SaveAs('cov_mcc8/figures/cor_%s.pdf' % w)
 
     cov = f.Get('cov')
     fcov = cov.Clone('fcov')
@@ -121,9 +122,9 @@ for w in wnames:
 
     fcov.Draw('colz')
     c1.SetRightMargin(0.18)
-    c1.SaveAs('figures/fcov_%s.pdf' % w)
+    c1.SaveAs('cov_mcc8/figures/fcov_%s.pdf' % w)
 
     g = np.array(g)
     diag = np.array(diag)
-    print np.sqrt(diag) / g
+    print(np.sqrt(diag) / g)
 
