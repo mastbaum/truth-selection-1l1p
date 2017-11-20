@@ -69,11 +69,13 @@ public:
   float nextShowerEnergyDistortion(float);
   float nextTrackEnergyDistortion(float);
 
+  void setAcceptP(bool, int);
+
   // Set a numeric dataset ID, which is written into the tree as a tag
   void setDatasetID(int id) { _dataset_id = id; }
 
-  // Utility function to test if a list of particles is 1l1p
-  static bool is1l1p(std::vector<PIDParticle>& p, int lpdg);
+  // Utility function to test if a list of particles is 1lip
+  bool is1lip(std::vector<PIDParticle>& p, int lpdg);
 
   // Apply track cuts
   static inline bool goodTrack(const sim::MCTrack& t, const simb::MCTruth& truth, float energy_distortion=0.) {
@@ -105,8 +107,8 @@ public:
     int int_mode;
     bool ccnc;
     double eccqe;
-    double ep;
-    int ppdg;
+    std::vector<double> eps;
+    std::vector<int> ppdgs;
     double elep;
     double thetalep;
     double philep;
@@ -147,7 +149,10 @@ protected:
   // random stuff
   std::mt19937 _gen;
 
-
+  // turn on/off different types of selections
+  bool _accept_1p;
+  bool _accept_np;
+  bool _accept_0p;
 
   bool _verbose;  //!< Print verbose output
   int _dataset_id;  //!< An arbitrary numeric ID
