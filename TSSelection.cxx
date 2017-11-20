@@ -302,7 +302,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
         mct.PdgCode(),
         mct.Start().Momentum(),
         mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()) + energy_distortion,
-        tsutil::eccqe(mct.Start().Momentum()),
+        tsutil::eccqe(mct.Start().Momentum(), energy_distortion),
         s,
         !tsutil::inFV(mct)
       });
@@ -345,7 +345,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
         // previous lines have this energy as:
         // mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode())
         mcs.Start().E() + energy_distortion,
-        tsutil::eccqe(mcs.Start().Momentum()),
+        tsutil::eccqe(mcs.Start().Momentum(), energy_distortion),
         -1,
         !tsutil::inFV(mcs)
       });
