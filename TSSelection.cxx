@@ -41,6 +41,15 @@ void TSSelection::setTrackEnergyResolution(float res, bool by_percent) {
   _track_energy_distribution = std::normal_distribution<float>(0., res);
 }
 
+void TSSelection::setAcceptP(bool b, int n_protons) {
+  if (n_protons == 0)
+    _accept_0p = b;
+  else if (n_protons == 1)
+    _accept_1p = b;
+  else if (n_protons > 1)
+    _accept_np = b;
+}
+
 float TSSelection::nextTrackEnergyDistortion(float this_energy=0.) {
   if (_track_energy_resolution < 1e-4)
     return 0.;
@@ -63,12 +72,7 @@ float TSSelection::nextShowerEnergyDistortion(float this_energy=0.) {
   }
 }
 
-bool TSSelection::is1l1p(std::vector<PIDParticle>& p, int lpdg) {
-  // Are there exactly two particles ID'ed?
-  if (p.size() > 2) {
-    return false;
-  }
-
+bool TSSelection::is1lip(std::vector<PIDParticle>& p, int lpdg) {
   // Count protons and the chosen lepton type
   size_t np = 0;
   size_t nl = 0;
@@ -81,7 +85,17 @@ bool TSSelection::is1l1p(std::vector<PIDParticle>& p, int lpdg) {
     }
   }
 
-  return np == 1 && nl == 1;
+  bool n_protons_good = false;
+  if (_accept_0p && np == 0)
+    n_protons_good = true;
+  else if (_accept_1p && np == 1)
+    n_protons_good = true;
+  else if (_accept_np && np > 1)
+    n_protons_good = true;
+
+  // always require one lepton
+  // there should only be one lepton + whatever many protons we accept
+  return n_protons_good && nl == 1 && nl + np == p.size();
 }
 
 
@@ -133,6 +147,10 @@ bool TSSelection::initialize() {
   _shower_energy_distribution = std::normal_distribution<float>(0.0, 0.0);
   _track_energy_distribution = std::normal_distribution<float>(0.0, 0.0);
 
+  _accept_1p = true;
+  _accept_0p = false;
+  _accept_np = false;
+
   // setting up random # stuff
   std::random_device rd;
   _gen = std::mt19937( rd() );;
@@ -153,8 +171,8 @@ bool TSSelection::initialize() {
   _tree->Branch("mode", &_data->int_mode);
   _tree->Branch("ccnc", &_data->ccnc);
   _tree->Branch("eccqe", &_data->eccqe);
-  _tree->Branch("ep", &_data->ep);
-  _tree->Branch("ppdg", &_data->ppdg);
+  _tree->Branch("eps", &_data->eps);
+  _tree->Branch("ppdgs", &_data->ppdgs);
   _tree->Branch("elep", &_data->elep);
   _tree->Branch("thetalep", &_data->thetalep);
   _tree->Branch("philep", &_data->philep);
@@ -333,13 +351,13 @@ bool TSSelection::analyze(gallery::Event* ev) {
       });
     }
 
-    // Classify the event (found/true 1l1p/1m1p)
-    // "True" 1l1p here means there are one true l and one true p that pass the
+    // Classify the event (found/true 1lip/1m1p)
+    // "True" good_event here means there are one true l and one true p that pass the
     // track/shower cuts (i.e. are in within this specific signal definition).
-    bool f_1e1p = is1l1p(particles_found, 11);
-    bool t_1e1p = is1l1p(particles_true, 11);
-    bool f_1m1p = is1l1p(particles_found, 13);
-    bool t_1m1p = is1l1p(particles_true, 13);
+    bool f_1e1p = is1lip(particles_found, 11);
+    bool t_1e1p = is1lip(particles_true, 11);
+    bool f_1m1p = is1lip(particles_found, 13);
+    bool t_1m1p = is1lip(particles_true, 13);
 
     // Where have all the muons gone?
     //if (t_1m1p && !f_1m1p) {
@@ -383,12 +401,14 @@ bool TSSelection::analyze(gallery::Event* ev) {
 
     // Write event to output tree for found 1l1p events
     if (f_1e1p || f_1m1p) {
-      double eccqe=-1, ep=-1, ppdg=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
+      double eccqe=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
 
+      std::vector<double> eps;
+      std::vector<int> ppdgs;
       for (size_t k=0; k<particles_found.size(); k++) {
         if (particles_found[k].pdg == 2212) {
-          ep = particles_found[k].evis;
-          ppdg = particles_found[k].pdgtrue;
+          eps.push_back( particles_found[k].evis );
+          ppdgs.push_back( particles_found[k].pdgtrue );
         }
         else {
           eccqe = particles_found[k].eccqe;
@@ -422,8 +442,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
       _data->int_mode = nu.Mode();
       _data->ccnc = nu.CCNC();
       _data->eccqe = eccqe;
-      _data->ep = ep;
-      _data->ppdg = ppdg;
+      _data->eps = eps;
+      _data->ppdgs = ppdgs;
       _data->elep = elep;
       _data->thetalep = thetalep;
       _data->philep = philep;

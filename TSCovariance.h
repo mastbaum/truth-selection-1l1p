@@ -23,6 +23,8 @@ public:
   void SetSeed(int _seed) { fSeed = _seed; }
   int WriteSystPlots(char* filename);
 
+  void setUseCCQE(bool);
+
   void init();
   void analyze();
 
@@ -99,6 +101,10 @@ private:
   double fScaleFactorE;  //!< POT scaling, etc.
   double fScaleFactorMu;  //!< POT scaling, etc.
   int fSeed;  //!< Random seed for ROOT
+
+  // whether to use the ccqe energy as the variable
+  // if set to false, uses the lepton + proton (shower + track) energy
+  bool _use_ccqe;
 };
 
 }  // namespace galleryfmwk

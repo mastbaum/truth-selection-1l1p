@@ -183,6 +183,9 @@ void TSCovariance::init() {
   samples.push_back(new EventSample("numu"));
   samples.push_back(new EventSample("nue"));
 
+  // use CCQE energy by default
+  _use_ccqe = true;
+
   std::cout << "TSCovariance: Initialized. Weights: ";
   for (auto it : use_weights) {
     std::cout << it << " ";
@@ -193,7 +196,10 @@ void TSCovariance::init() {
 
   gRandom->SetSeed(fSeed);
 }
-  
+
+void TSCovariance::setUseCCQE(bool b) {
+  _use_ccqe = b;
+} 
 
 void TSCovariance::analyze() {
   // Grab the MCTruth information
@@ -238,7 +244,8 @@ void TSCovariance::analyze() {
     }
 
     // The observable
-    double nuEnergy = _data.eccqe;
+    double nuEnergy = _use_ccqe ? _data.eccqe : 
+       std::accumulate(_data.eps.begin(), _data.eps.end(), 0.0) + _data.elep;
 
     // Determine which event sample this event corresponds to, based on
     // lepton PID
