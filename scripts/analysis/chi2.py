@@ -26,6 +26,9 @@ matplotlib.rcParams['axes.titlesize'] = 16
 matplotlib.rcParams['axes.labelsize'] = 16
 matplotlib.rcParams['legend.fontsize'] = 12
 
+import argparse
+import time
+
 def mc_chi2(data, exp, cov, n=250000, n2=0, plot=False):
     '''Calculate a p-value with a Monte Carlo using a chi2-like statistic.
 
@@ -462,6 +465,11 @@ def plot_bin_errors(emx, em, eex, ee, ess, fcov,
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("background_dir")
+    parser.add_argument("signal_dir")
+    parser.add_argument("--mcmc", action="store_true")
+    args = parser.parse_args()
 
     # argv1: merged background output from cov.py
     # argv2: merged signal output from cov.py 
@@ -469,9 +477,9 @@ if __name__ == '__main__':
     #enu_mx, enu_m, enu_ex, enu_e, enu_s, enu_ss, cov = \
     #    load('cov_merged/cov_all.root', 'cov_sig_2/cov_all.root')
     enu_mx, enu_m, enu_ex, enu_e, enu_s, enu_ss, cov = \
+        load(args.background_dir + '/cov_all.root', args.signal_dir + '/cov_all.root')
         #load('/Volumes/Storage/sbn/lee/truth_sel/cov_mcc8/cov_all.root',
         #     '/Volumes/Storage/sbn/lee/truth_sel/cov_signal_new/cov_all.root')
-        load(sys.argv[1] + '/cov_all.root', sys.argv[2] + '/cov_all.root')
 
     eb = np.hstack((enu_m, enu_e))
     fcov = cov / np.einsum('i,j', eb, eb)
@@ -480,10 +488,10 @@ if __name__ == '__main__':
     do_sigma_pot_plot = True
     if do_sigma_pot_plot:
         #pots = np.linspace(5e19, 6.6e20, 3)
-        pots = np.linspace(5e19, 6.6e20, 10)
-        p1 = plot_sigma_v_pot(enu_m, enu_e, enu_s, fcov, pots, mc=False)[0]
+        pots = np.linspace(5e19, 6.8e20, 10)
+        p1 = plot_sigma_v_pot(enu_m, enu_e, enu_s, fcov, pots, mc=args.mcmc)[0]
         p1.set_label('Stat+Syst')
-        p2 = plot_sigma_v_pot(enu_m, enu_e, enu_s, fcov, pots, mc=False, syst=False)[0]
+        p2 = plot_sigma_v_pot(enu_m, enu_e, enu_s, fcov, pots, mc=args.mcmc, syst=False)[0]
         p2.set_label('Stat Only')
         plt.legend(loc='best')
         plt.axhline(5.0, ls='--', lw=1, color='black', label='$5\\sigma$')
@@ -518,11 +526,19 @@ if __name__ == '__main__':
 
         print('6.6e20 stat mc: %f' %
                significance(em, ee, es, fcov,
+<<<<<<< HEAD
                pot=66e19, syst=False, mc=False, eff_m=0.3, eff_e=0.3))
 
         print('6.6e20 syst mc: %f' %
                significance(em, ee, es, fcov,
                pot=66e19, syst=True, mc=False, eff_m=0.3, eff_e=0.3))
+=======
+               pot=66e19, syst=False, mc=args.mcmc, eff_m=0.3, eff_e=0.3))
+
+        print('6.6e20 syst mc: %f' %
+               significance(em, ee, es, fcov,
+               pot=66e19, syst=True, mc=args.mcmc, eff_m=0.3, eff_e=0.3))
+>>>>>>> added argparse for mcmc on chi2.py
 
         #print('5.0e19 syst mc: %f' %
         #       significance(em, ee, es, fcov,
