@@ -14,7 +14,7 @@
 #include "nusimdata/SimulationBase/MCTruth.h"
 #include "lardataobj/MCBase/MCShower.h"
 #include "lardataobj/MCBase/MCTrack.h"
-#include "Analysis/ana_base.h"
+#include "gallery/Event.h"
 #include "TSUtil.h"
 
 class TDatabasePDG;
@@ -29,7 +29,7 @@ namespace galleryfmwk {
  * \class TSSelection
  * \brief Truth-based selection approximating 1l1p
  */
-class TSSelection : galleryfmwk::ana_base {
+class TSSelection {
 
 public:
   // A structure to hold temporary track/shower data during processing
@@ -46,7 +46,7 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const PIDParticle& dt);
   };
 
-  TSSelection() : _verbose(false) {}
+  TSSelection(): _verbose(false) {}
 
   bool initialize();
 
@@ -55,6 +55,8 @@ public:
   bool finalize();
 
   void setVerbose(bool b) { _verbose = b; }
+
+  void setOutputFile(TFile *f) { _fout = f; }
 
   // Set the producers for data products
   void setFluxWeightProducer(std::string s) { _fw_producer = s; }
@@ -161,6 +163,9 @@ protected:
 
   TNtuple* _truthtree;
   TNtuple* _mectree;
+
+  // output file
+  TFile* _fout;
 
   TFile* _pdf_file;  //!< File containing dE/dx PDFs
   std::map<int, TH2F*> _trackdedxs;  // Track dE/dx distributions
