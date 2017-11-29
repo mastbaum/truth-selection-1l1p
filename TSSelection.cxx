@@ -101,7 +101,7 @@ bool TSSelection::is1lip(std::vector<PIDParticle>& p, int lpdg) {
 
 bool TSSelection::initialize() {
   // Load track dE/dx distributions from file
-  _pdf_file = TFile::Open("./data/dedx_pdfs.root");
+  _pdf_file = TFile::Open("./dedx_pdfs.root");
   assert(_pdf_file->IsOpen());
 
   TIter next(_pdf_file->GetListOfKeys());
