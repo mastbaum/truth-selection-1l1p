@@ -12,10 +12,6 @@ def loop_merge(dir_name, data_dir, temp_dir, append, n_data, final_name):
     merge_count = 0
 
     while 1:
-        if dir_name == 926:
-            print "END OF DATA"
-            last_failed = True
-            break
         fname = datadir + str(dir_name) + "/out.root"
         if not os.path.isfile(fname):
             if last_failed:
