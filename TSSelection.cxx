@@ -42,9 +42,7 @@ void TSSelection::setTrackEnergyResolution(float res, bool by_percent) {
 }
 
 void TSSelection::setAcceptP(bool b, int n_protons) {
-  if (n_protons == 0)
-    _accept_0p = b;
-  else if (n_protons == 1)
+  if (n_protons == 1)
     _accept_1p = b;
   else if (n_protons > 1)
     _accept_np = b;
@@ -86,9 +84,7 @@ bool TSSelection::is1lip(std::vector<PIDParticle>& p, int lpdg) {
   }
 
   bool n_protons_good = false;
-  if (_accept_0p && np == 0)
-    n_protons_good = true;
-  else if (_accept_1p && np == 1)
+  if (_accept_1p && np == 1)
     n_protons_good = true;
   else if (_accept_np && np > 1)
     n_protons_good = true;
@@ -148,7 +144,7 @@ bool TSSelection::initialize() {
   _track_energy_distribution = std::normal_distribution<float>(0.0, 0.0);
 
   _accept_1p = true;
-  _accept_0p = false;
+  _accept_ntrk = false;
   _accept_np = false;
 
   // setting up random # stuff
