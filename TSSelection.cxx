@@ -95,7 +95,7 @@ bool TSSelection::is1lip(std::vector<PIDParticle>& p, int lpdg) {
 }
 
 
-bool TSSelection::initialize() {
+bool TSSelection::initialize(std::vector<std::string> input_files) {
   // Load track dE/dx distributions from file
   _pdf_file = TFile::Open("./dedx_pdfs.root");
   assert(_pdf_file->IsOpen());
@@ -123,6 +123,8 @@ bool TSSelection::initialize() {
       _trackdedxs[pdg] = h;
     }
   }
+  // initialize input files
+  _input_files = input_files;
 
   // Initialize dataset identifier
   _dataset_id = -1;
@@ -153,6 +155,7 @@ bool TSSelection::initialize() {
 
   // Set up the output trees
   assert(_fout);
+  assert(_fout->IsOpen());
   _fout->cd();
 
   _data = new OutputData;
@@ -187,6 +190,14 @@ bool TSSelection::initialize() {
 }
 
 
+bool TSSelection::run() {
+  bool ret = true;
+  for (gallery::Event ev(_input_files) ; !ev.atEnd(); ev.next()) {
+    ret = ret && analyze(&ev);
+  }
+  return ret;
+}
+
 bool TSSelection::analyze(gallery::Event* ev) {
   // Get handles for event data
   art::InputTag gtruth_tag(_mct_producer);
@@ -219,8 +230,6 @@ bool TSSelection::analyze(gallery::Event* ev) {
       eventweights_list[0].fWeight.find("bnbcorrection_FluxHist") != eventweights_list[0].fWeight.end()) {
     wbnb = eventweights_list[0].fWeight.at("bnbcorrection_FluxHist")[0];
   }
-
-  _fout->cd();
 
   // Loop through MC truth interactions
   for(size_t i=0; i<mctruth_list.size(); i++) {
@@ -394,7 +403,6 @@ bool TSSelection::analyze(gallery::Event* ev) {
       }
       std::cout << std::endl;
     }
-
     // Write event to output tree for found 1l1p events
     if (f_1e1p || f_1m1p) {
       double eccqe=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
@@ -452,6 +460,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
       _data->weights = &wgh;
       _tree->Fill();
     }
+
 
     // Fill the event truth tree
     float vtt[22] = {
