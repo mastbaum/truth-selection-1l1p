@@ -126,6 +126,32 @@ public:
     std::map<std::string, std::vector<double> >* weights;
   };
 
+  // structure to hold bokkeeping data
+  struct HeaderData {
+    // Data product producers
+    std::string track_producer;
+    std::string fw_producer;
+    std::string ew_producer;
+    std::string mct_producer;
+    std::string mcf_producer;
+    std::string mctrk_producer;
+    std::string mcshw_producer;
+    
+    // Optionally set some energy resolution
+    float shower_energy_resolution;
+    bool shower_energy_by_percent;
+    float track_energy_resolution;
+    bool track_energy_by_percent;
+    
+    // turn on/off different types of selections
+    bool accept_1p;
+    bool accept_np;
+    bool accept_ntrk;
+    
+    // input files
+    std::vector<std::string> input_files;  
+  };
+
 protected:
   // Data product producers
   std::string _track_producer;

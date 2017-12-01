@@ -552,12 +552,59 @@ bool TSSelection::finalize() {
             << 1.0 * good_1m1p / (good_1m1p + miss_1m1p)
             << std::endl;
 
+  std::cout << "SHOWER, TRACK ENERGY RESOLUTION: " << _shower_energy_resolution << " "<< _track_energy_resolution << std::endl;
+
+  // record header data
+  _fout->cd();
+  HeaderData header;
+  HeaderData *to_header = &header;
+  TTree *header_tree = new TTree("header", "");
+  header_tree->Branch("track_producer", &to_header->track_producer);
+  header_tree->Branch("fw_producer", &to_header->fw_producer);
+  header_tree->Branch("ew_producer", &to_header->ew_producer);
+  header_tree->Branch("mct_producer", &to_header->mct_producer);
+  header_tree->Branch("mcf_producer", &to_header->mcf_producer);
+  header_tree->Branch("mctrk_producer", &to_header->mctrk_producer);
+  header_tree->Branch("mcshw_producer", &to_header->mcshw_producer);
+
+  header_tree->Branch("shower_energy_resolution", &to_header->shower_energy_resolution);
+  header_tree->Branch("shower_energy_by_percent", &to_header->shower_energy_by_percent);
+  header_tree->Branch("track_energy_resolution", &to_header->track_energy_resolution);
+  header_tree->Branch("track_energy_by_percent", &to_header->track_energy_by_percent);
+
+  header_tree->Branch("accept_1p", &to_header->accept_1p);
+  header_tree->Branch("accept_np", &to_header->accept_np);
+  header_tree->Branch("accept_ntrk", &to_header->accept_ntrk);
+  header_tree->Branch("input_files", &to_header->input_files);
+
+  header.track_producer = _track_producer;
+  header.fw_producer = _fw_producer;
+  header.ew_producer = _ew_producer;
+  header.mct_producer = _mct_producer;
+  header.mcf_producer = _mcf_producer;
+  header.mctrk_producer = _mctrk_producer;
+  header.mcshw_producer = _mcshw_producer;
+
+  header.shower_energy_resolution = _shower_energy_resolution;
+  header.shower_energy_by_percent = _shower_energy_by_percent;
+  header.track_energy_resolution = _track_energy_resolution;
+  header.track_energy_by_percent = _track_energy_by_percent;
+
+  header.accept_1p = _accept_1p;
+  header.accept_np = _accept_np;
+  header.accept_ntrk = _accept_ntrk;
+
+  header.input_files = _input_files;
+
+  header_tree->Fill();
+
   // Write output to ROOT file
   if (_fout) {
     _fout->cd();
     _tree->Write();
     _truthtree->Write();
     _mectree->Write();
+    header_tree->Write();
   }
 
   return true;
