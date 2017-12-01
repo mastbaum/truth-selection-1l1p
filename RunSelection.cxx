@@ -14,6 +14,26 @@
 using namespace std;
 using namespace art;
 
+// copied from stack overflow
+inline bool isInteger(const std::string & s)
+{
+   if(s.empty() || ((!isdigit(s[0])) && (s[0] != '-') && (s[0] != '+'))) return false ;
+
+   char *p ;
+   strtol(s.c_str(), &p, 10) ;
+
+   return (*p == 0) ;
+}
+
+bool isNumber(const std::string& s)
+{
+   if(s.empty() || ((!isdigit(s[0])) && (s[0] != '-') && (s[0] != '+'))) return false ;
+
+    char *end = 0;
+    strtod(s.c_str(), &end);
+    return end != s.c_str();
+}
+
 // stand alone executable for TSSelection
 int main(int argv, char** argc) {
   if (argv < 3) {
@@ -23,12 +43,13 @@ int main(int argv, char** argc) {
 
 
   // All of the options
-  std::experimental::optional<int> maybe_dataset_id = {};
+  int n_selections = 1;
+  std::vector<int> dataset_id = {};
 
-  std::experimental::optional<float> maybe_track_energy_distortion = {};
+  std::vector<float> track_energy_distortion = {};
   bool track_energy_distortion_by_percent = false;
 
-  std::experimental::optional<float> maybe_shower_energy_distortion = {};  
+  std::vector<float> shower_energy_distortion = {};  
   bool shower_energy_distortion_by_percent = false;
 
   bool accept_np = false;
@@ -36,20 +57,46 @@ int main(int argv, char** argc) {
 
   cout << "Processing Runtime arguments" << endl;
 
-  TFile f_out(argc[1], "NEW");
+  std::vector<TFile *> f_outs;
   //We have passed the input file as an argument to the function 
   vector<string> filename;
-  for (int i = 2; i < argv; ++i) {
-    if (strcmp(argc[i], "-d") == 0 || strcmp(argc[i], "--datasetId") == 0) {
+  for (int i = 1; i < argv; ++i) {
+    if (strcmp(argc[i], "-o") == 0 || strcmp(argc[i], "--output_file") == 0) {
       i ++;
-      maybe_dataset_id = stoi(argc[i]);
-      cout << "Dataset Id: " << maybe_dataset_id.value() << endl;
+      while (i < argv && argc[i][0] != '-') {
+        f_outs.push_back( new TFile(argc[i], "RECREATE") );
+        cout << "Output File " << f_outs.size() << ": " << argc[i] << endl;
+        i ++;
+      }
+    }
+    if (strcmp(argc[i], "-n") == 0 || strcmp(argc[i], "--Nselections") == 0) {
+      i ++;
+      n_selections = stoi(argc[i]);
+      cout << "N Selections: " << n_selections << endl;
+      continue;
+    }
+    if (strcmp(argc[i], "-d") == 0 || strcmp(argc[i], "--datasetId") == 0) {
+      while ( i+1 < argv && isNumber(argc[i+1]) ) {
+        i ++;
+        dataset_id.push_back( stoi(argc[i]) );
+      }
+      cout << "Dataset Id: " ;
+      for (auto d: dataset_id) {
+          cout << d << " ";
+      }
+      cout << endl;
       continue;
     }
     if (strcmp(argc[i], "--T_energy_distortion") == 0) {
-      i ++;
-      maybe_track_energy_distortion = stof(argc[i]);
-      cout << "Track Energy Distortion: " << maybe_track_energy_distortion.value() << endl;
+      while( i+1 < argv && isNumber(argc[i+1]) ) {
+        i ++;
+        track_energy_distortion.push_back( stof(argc[i]) );
+      }
+      cout << "Track Energy Distortion: ";
+      for (auto dist: track_energy_distortion) {
+        cout << dist << " ";
+      }
+      cout << endl;
       continue;
     }
     if (strcmp(argc[i], "--T_edist_by_percent") == 0) {
@@ -58,9 +105,15 @@ int main(int argv, char** argc) {
       continue;
     }
     if (strcmp(argc[i], "--S_energy_distortion") == 0) {
-      i ++;
-      maybe_shower_energy_distortion = stof(argc[i]);
-      cout << "Shower Energy Distortion: " << maybe_shower_energy_distortion.value() << endl;
+      while ( i+1 < argv && isNumber(argc[i+1]) ) {
+        i ++;
+        shower_energy_distortion.push_back( stof(argc[i]) );
+      }
+      cout << "Shower Energy Distortion: ";
+      for (auto dist: shower_energy_distortion) {
+        cout << dist << " ";
+      }
+      cout << endl;
       continue;
     }
     if (strcmp(argc[i], "--S_edist_by_percent") == 0) {
@@ -79,37 +132,50 @@ int main(int argv, char** argc) {
       continue;
     }
     filename.push_back(string(argc[i]));
+    cout << "Input file: " << argc[i] << endl;
   }
 
-  galleryfmwk::TSSelection selection;
-  selection.setFluxWeightProducer("eventweight");
-  selection.setEventWeightProducer("mcweight");
-  selection.setMCTruthProducer("generator");
-  selection.setMCTrackProducer("mcreco");
-  selection.setMCShowerProducer("mcreco");
-  selection.setVerbose(true);
+  std::vector<galleryfmwk::TSSelection> selections(n_selections);
 
-  selection.setOutputFile(&f_out); 
-
-  if (bool(maybe_dataset_id)) {
-    selection.setDatasetID(maybe_dataset_id.value());
-  }
-  if (bool(maybe_track_energy_distortion)) {
-    selection.setTrackEnergyResolution(maybe_track_energy_distortion.value(), track_energy_distortion_by_percent);
-  } 
-  if (bool(maybe_shower_energy_distortion)) {
-    selection.setShowerEnergyResolution(maybe_shower_energy_distortion.value(), shower_energy_distortion_by_percent);
+  cout << "Initialize" << endl;
+  for (int i = 0; i < n_selections; i ++) {
+    selections[i].setOutputFile(f_outs[i]); 
+    std::vector<std::string> this_filename(filename);
+    selections[i].initialize(this_filename);
   }
 
-  cout << "Initialized" << endl;
-  selection.initialize();
+  for (int i = 0; i < n_selections; i ++) {
+    selections[i].setFluxWeightProducer("eventweight");
+    selections[i].setEventWeightProducer("mcweight");
+    selections[i].setMCTruthProducer("generator");
+    selections[i].setMCTrackProducer("mcreco");
+    selections[i].setMCShowerProducer("mcreco");
+    selections[i].setVerbose(true);
+    
+   
+    if (dataset_id.size() > 0) {
+        selections[i].setDatasetID( dataset_id[i] );
+    } 
+    if (track_energy_distortion.size() > 0) {
+      selections[i].setTrackEnergyResolution(track_energy_distortion[i], track_energy_distortion_by_percent);
+    } 
+    if (shower_energy_distortion.size() > 0) {
+      selections[i].setShowerEnergyResolution(shower_energy_distortion[i], shower_energy_distortion_by_percent);
+    }
+  }
+
+
 
   cout << "Analyze" << endl;
-  for (gallery::Event ev(filename) ; !ev.atEnd(); ev.next()) {
-    selection.analyze(&ev);
+  for (gallery::Event ev(filename) ; !ev.atEnd(); ev.next()) { 
+    for (galleryfmwk::TSSelection &selection: selections) {
+      selection.analyze(&ev);
+    }
   }
   
   cout << "Finalize" << endl;
-  selection.finalize();
+  for (galleryfmwk::TSSelection &selection: selections) {
+    selection.finalize();
+  }
 }
 
