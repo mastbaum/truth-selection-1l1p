@@ -48,7 +48,9 @@ public:
 
   TSSelection(): _verbose(false) {}
 
-  bool initialize();
+  bool initialize(std::vector<std::string> input_files);
+
+  bool run();
 
   bool analyze(gallery::Event* ev);
 
@@ -164,6 +166,9 @@ protected:
 
   TNtuple* _truthtree;
   TNtuple* _mectree;
+
+  // input files
+  std::vector<std::string> _input_files;
 
   // output file
   TFile* _fout;
