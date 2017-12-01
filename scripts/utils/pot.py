@@ -20,7 +20,7 @@ import ROOT
 def main(files):
     t = ROOT.TChain('tree')
     for fi in files:
-        t.Add('%s/SubRuns' % fi)
+        t.Add('%s/SubRuns' % fi.rstrip("\n"))
 
     t.SetScanField(0)
     t.Scan("sumdata::POTSummary_generator__GenieGen.obj.totgoodpot")
@@ -33,5 +33,6 @@ if __name__ == '__main__':
         print 'Usage:', sys.argv[0], '"files*.root"'
         sys.exit(1)
 
-    main(glob(sys.argv[1]))
+    with open(sys.argv[1]) as f:
+        main(f.readlines())
 
