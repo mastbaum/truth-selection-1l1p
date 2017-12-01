@@ -72,6 +72,7 @@ public:
   float nextTrackEnergyDistortion(float);
 
   void setAcceptP(bool, int);
+  void setAcceptNTrk(bool b) { _accept_ntrk = b; }
 
   // Set a numeric dataset ID, which is written into the tree as a tag
   void setDatasetID(int id) { _dataset_id = id; }
@@ -154,7 +155,7 @@ protected:
   // turn on/off different types of selections
   bool _accept_1p;
   bool _accept_np;
-  bool _accept_0p;
+  bool _accept_ntrk;
 
   bool _verbose;  //!< Print verbose output
   int _dataset_id;  //!< An arbitrary numeric ID
