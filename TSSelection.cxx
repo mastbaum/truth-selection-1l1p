@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+// includes for random draws from gaussian
+#include <random>
+
 #include "canvas/Utilities/InputTag.h"
 #include "canvas/Persistency/Common/FindMany.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
@@ -26,13 +29,48 @@
 #include "TSSelection.h"
 
 namespace galleryfmwk {
+void TSSelection::setShowerEnergyResolution(float res, bool by_percent) {
+  _shower_energy_resolution = res;
+  _shower_energy_by_percent = by_percent;
+  _shower_energy_distribution = std::normal_distribution<float>(0., res);
+}
 
-bool TSSelection::is1l1p(std::vector<PIDParticle>& p, int lpdg) {
-  // Are there exactly two particles ID'ed?
-  if (p.size() > 2) {
-    return false;
+void TSSelection::setTrackEnergyResolution(float res, bool by_percent) {
+  _track_energy_resolution = res;
+  _track_energy_by_percent = by_percent;
+  _track_energy_distribution = std::normal_distribution<float>(0., res);
+}
+
+void TSSelection::setAcceptP(bool b, int n_protons) {
+  if (n_protons == 1)
+    _accept_1p = b;
+  else if (n_protons > 1)
+    _accept_np = b;
+}
+
+float TSSelection::nextTrackEnergyDistortion(float this_energy=0.) {
+  if (_track_energy_resolution < 1e-4)
+    return 0.;
+  if (_track_energy_by_percent) {
+    return _track_energy_distribution( _gen ) * this_energy; 
+  } 
+  else {
+    return _track_energy_distribution( _gen );
   }
+}
 
+float TSSelection::nextShowerEnergyDistortion(float this_energy=0.) {
+  if (_shower_energy_resolution < 1e-4)
+    return 0.;
+  if (_shower_energy_by_percent) {
+    return _shower_energy_distribution( _gen) * this_energy;
+  }
+  else {
+    return _shower_energy_distribution( _gen );
+  }
+}
+
+bool TSSelection::is1lip(std::vector<PIDParticle>& p, int lpdg) {
   // Count protons and the chosen lepton type
   size_t np = 0;
   size_t nl = 0;
@@ -45,13 +83,21 @@ bool TSSelection::is1l1p(std::vector<PIDParticle>& p, int lpdg) {
     }
   }
 
-  return np == 1 && nl == 1;
+  bool n_protons_good = false;
+  if (_accept_1p && np == 1)
+    n_protons_good = true;
+  else if (_accept_np && np > 1)
+    n_protons_good = true;
+
+  // always require one lepton
+  // there should only be one lepton + whatever many protons we accept
+  return n_protons_good && nl == 1 && nl + np == p.size();
 }
 
 
-bool TSSelection::initialize() {
+bool TSSelection::initialize(std::vector<std::string> input_files) {
   // Load track dE/dx distributions from file
-  _pdf_file = TFile::Open("./data/dedx_pdfs.root");
+  _pdf_file = TFile::Open("./dedx_pdfs.root");
   assert(_pdf_file->IsOpen());
 
   TIter next(_pdf_file->GetListOfKeys());
@@ -77,6 +123,8 @@ bool TSSelection::initialize() {
       _trackdedxs[pdg] = h;
     }
   }
+  // initialize input files
+  _input_files = input_files;
 
   // Initialize dataset identifier
   _dataset_id = -1;
@@ -89,8 +137,25 @@ bool TSSelection::initialize() {
   good_1m1p = 0;
   miss_1m1p = 0;
 
+  // initialize resolutions to 0 (perfect resolution)
+  _shower_energy_resolution = 0.;
+  _track_energy_resolution = 0.;
+  _shower_energy_by_percent = false;
+  _track_energy_by_percent = false;
+  _shower_energy_distribution = std::normal_distribution<float>(0.0, 0.0);
+  _track_energy_distribution = std::normal_distribution<float>(0.0, 0.0);
+
+  _accept_1p = true;
+  _accept_ntrk = false;
+  _accept_np = false;
+
+  // setting up random # stuff
+  std::random_device rd;
+  _gen = std::mt19937( rd() );;
+
   // Set up the output trees
   assert(_fout);
+  assert(_fout->IsOpen());
   _fout->cd();
 
   _data = new OutputData;
@@ -105,8 +170,8 @@ bool TSSelection::initialize() {
   _tree->Branch("mode", &_data->int_mode);
   _tree->Branch("ccnc", &_data->ccnc);
   _tree->Branch("eccqe", &_data->eccqe);
-  _tree->Branch("ep", &_data->ep);
-  _tree->Branch("ppdg", &_data->ppdg);
+  _tree->Branch("eps", &_data->eps);
+  _tree->Branch("ppdgs", &_data->ppdgs);
   _tree->Branch("elep", &_data->elep);
   _tree->Branch("thetalep", &_data->thetalep);
   _tree->Branch("philep", &_data->philep);
@@ -124,6 +189,14 @@ bool TSSelection::initialize() {
   return true;
 }
 
+
+bool TSSelection::run() {
+  bool ret = true;
+  for (gallery::Event ev(_input_files) ; !ev.atEnd(); ev.next()) {
+    ret = ret && analyze(&ev);
+  }
+  return ret;
+}
 
 bool TSSelection::analyze(gallery::Event* ev) {
   // Get handles for event data
@@ -158,8 +231,6 @@ bool TSSelection::analyze(gallery::Event* ev) {
     wbnb = eventweights_list[0].fWeight.at("bnbcorrection_FluxHist")[0];
   }
 
-  _fout->cd();
-
   // Loop through MC truth interactions
   for(size_t i=0; i<mctruth_list.size(); i++) {
     const simb::MCTruth& mctruth = mctruth_list.at(i);
@@ -175,8 +246,11 @@ bool TSSelection::analyze(gallery::Event* ev) {
     for (size_t j=0; j<mctrack_list.size(); j++) {
       const sim::MCTrack& mct = mctrack_list.at(j);
 
+      float this_energy = mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode());
+      float energy_distortion = nextTrackEnergyDistortion( this_energy );
+
       // Apply track cuts
-      if (!goodTrack(mct, mctruth)) {
+      if (!goodTrack(mct, mctruth, energy_distortion)) {
         continue;
       }
 
@@ -188,6 +262,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
         pos = mct[k].Position();
       }
 
+      // don't apply energy distortion to the "true" particle data
       particles_true.push_back({
         mct.PdgCode(),
         mct.PdgCode(),
@@ -231,8 +306,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
         pdg_best,
         mct.PdgCode(),
         mct.Start().Momentum(),
-        mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()),
-        tsutil::eccqe(mct.Start().Momentum()),
+        mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()) + energy_distortion,
+        tsutil::eccqe(mct.Start().Momentum(), energy_distortion),
         s,
         !tsutil::inFV(mct)
       });
@@ -243,11 +318,15 @@ bool TSSelection::analyze(gallery::Event* ev) {
     for (size_t j=0; j<mcshower_list.size(); j++) {
       const sim::MCShower& mcs = mcshower_list.at(j);
 
+      float this_energy = mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode());
+      float energy_distortion = nextShowerEnergyDistortion( this_energy );
+
       // Apply shower cuts
-      if (!goodShower(mcs, mctruth)) {
+      if (!goodShower(mcs, mctruth, energy_distortion)) {
         continue;
       }
 
+      // don't apply energy distortion to the "true" particle data
       particles_true.push_back({
         mcs.PdgCode(),
         mcs.PdgCode(),
@@ -267,20 +346,23 @@ bool TSSelection::analyze(gallery::Event* ev) {
         pdg_best,
         mcs.PdgCode(),
         mcs.Start().Momentum(),
-        mcs.Start().E(),
-        tsutil::eccqe(mcs.Start().Momentum()),
+        // @ANDY: IS THIS A BUG???
+        // previous lines have this energy as:
+        // mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode())
+        mcs.Start().E() + energy_distortion,
+        tsutil::eccqe(mcs.Start().Momentum(), energy_distortion),
         -1,
         !tsutil::inFV(mcs)
       });
     }
 
-    // Classify the event (found/true 1l1p/1m1p)
-    // "True" 1l1p here means there are one true l and one true p that pass the
+    // Classify the event (found/true 1lip/1m1p)
+    // "True" good_event here means there are one true l and one true p that pass the
     // track/shower cuts (i.e. are in within this specific signal definition).
-    bool f_1e1p = is1l1p(particles_found, 11);
-    bool t_1e1p = is1l1p(particles_true, 11);
-    bool f_1m1p = is1l1p(particles_found, 13);
-    bool t_1m1p = is1l1p(particles_true, 13);
+    bool f_1e1p = is1lip(particles_found, 11);
+    bool t_1e1p = is1lip(particles_true, 11);
+    bool f_1m1p = is1lip(particles_found, 13);
+    bool t_1m1p = is1lip(particles_true, 13);
 
     // Where have all the muons gone?
     //if (t_1m1p && !f_1m1p) {
@@ -321,15 +403,16 @@ bool TSSelection::analyze(gallery::Event* ev) {
       }
       std::cout << std::endl;
     }
-
     // Write event to output tree for found 1l1p events
     if (f_1e1p || f_1m1p) {
-      double eccqe=-1, ep=-1, ppdg=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
+      double eccqe=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
 
+      std::vector<double> eps;
+      std::vector<int> ppdgs;
       for (size_t k=0; k<particles_found.size(); k++) {
         if (particles_found[k].pdg == 2212) {
-          ep = particles_found[k].evis;
-          ppdg = particles_found[k].pdgtrue;
+          eps.push_back( particles_found[k].evis );
+          ppdgs.push_back( particles_found[k].pdgtrue );
         }
         else {
           eccqe = particles_found[k].eccqe;
@@ -363,8 +446,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
       _data->int_mode = nu.Mode();
       _data->ccnc = nu.CCNC();
       _data->eccqe = eccqe;
-      _data->ep = ep;
-      _data->ppdg = ppdg;
+      _data->eps = eps;
+      _data->ppdgs = ppdgs;
       _data->elep = elep;
       _data->thetalep = thetalep;
       _data->philep = philep;
@@ -377,6 +460,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
       _data->weights = &wgh;
       _tree->Fill();
     }
+
 
     // Fill the event truth tree
     float vtt[22] = {
@@ -468,12 +552,59 @@ bool TSSelection::finalize() {
             << 1.0 * good_1m1p / (good_1m1p + miss_1m1p)
             << std::endl;
 
+  std::cout << "SHOWER, TRACK ENERGY RESOLUTION: " << _shower_energy_resolution << " "<< _track_energy_resolution << std::endl;
+
+  // record header data
+  _fout->cd();
+  HeaderData header;
+  HeaderData *to_header = &header;
+  TTree *header_tree = new TTree("header", "");
+  header_tree->Branch("track_producer", &to_header->track_producer);
+  header_tree->Branch("fw_producer", &to_header->fw_producer);
+  header_tree->Branch("ew_producer", &to_header->ew_producer);
+  header_tree->Branch("mct_producer", &to_header->mct_producer);
+  header_tree->Branch("mcf_producer", &to_header->mcf_producer);
+  header_tree->Branch("mctrk_producer", &to_header->mctrk_producer);
+  header_tree->Branch("mcshw_producer", &to_header->mcshw_producer);
+
+  header_tree->Branch("shower_energy_resolution", &to_header->shower_energy_resolution);
+  header_tree->Branch("shower_energy_by_percent", &to_header->shower_energy_by_percent);
+  header_tree->Branch("track_energy_resolution", &to_header->track_energy_resolution);
+  header_tree->Branch("track_energy_by_percent", &to_header->track_energy_by_percent);
+
+  header_tree->Branch("accept_1p", &to_header->accept_1p);
+  header_tree->Branch("accept_np", &to_header->accept_np);
+  header_tree->Branch("accept_ntrk", &to_header->accept_ntrk);
+  header_tree->Branch("input_files", &to_header->input_files);
+
+  header.track_producer = _track_producer;
+  header.fw_producer = _fw_producer;
+  header.ew_producer = _ew_producer;
+  header.mct_producer = _mct_producer;
+  header.mcf_producer = _mcf_producer;
+  header.mctrk_producer = _mctrk_producer;
+  header.mcshw_producer = _mcshw_producer;
+
+  header.shower_energy_resolution = _shower_energy_resolution;
+  header.shower_energy_by_percent = _shower_energy_by_percent;
+  header.track_energy_resolution = _track_energy_resolution;
+  header.track_energy_by_percent = _track_energy_by_percent;
+
+  header.accept_1p = _accept_1p;
+  header.accept_np = _accept_np;
+  header.accept_ntrk = _accept_ntrk;
+
+  header.input_files = _input_files;
+
+  header_tree->Fill();
+
   // Write output to ROOT file
   if (_fout) {
     _fout->cd();
     _tree->Write();
     _truthtree->Write();
     _mectree->Write();
+    header_tree->Write();
   }
 
   return true;

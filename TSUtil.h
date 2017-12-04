@@ -43,7 +43,7 @@ bool isFromNuVertex(const simb::MCTruth& mc, const sim::MCTrack& track,
 
 
 // Calculate the CCQE energy from lepton four-momentum
-double eccqe(const TLorentzVector& v);
+double eccqe(const TLorentzVector& v, float energy_distortion=0.0);
 
 
 // Get the mass for a particle or ion

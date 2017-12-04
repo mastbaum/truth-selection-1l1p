@@ -9,11 +9,12 @@
 
 #include <map>
 #include <string>
+#include <random>
 
 #include "nusimdata/SimulationBase/MCTruth.h"
 #include "lardataobj/MCBase/MCShower.h"
 #include "lardataobj/MCBase/MCTrack.h"
-#include "Analysis/ana_base.h"
+#include "gallery/Event.h"
 #include "TSUtil.h"
 
 class TDatabasePDG;
@@ -28,7 +29,7 @@ namespace galleryfmwk {
  * \class TSSelection
  * \brief Truth-based selection approximating 1l1p
  */
-class TSSelection : galleryfmwk::ana_base {
+class TSSelection {
 
 public:
   // A structure to hold temporary track/shower data during processing
@@ -45,15 +46,19 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const PIDParticle& dt);
   };
 
-  TSSelection() : _verbose(false) {}
+  TSSelection(): _verbose(false) {}
 
-  bool initialize();
+  bool initialize(std::vector<std::string> input_files);
+
+  bool run();
 
   bool analyze(gallery::Event* ev);
 
   bool finalize();
 
   void setVerbose(bool b) { _verbose = b; }
+
+  void setOutputFile(TFile *f) { _fout = f; }
 
   // Set the producers for data products
   void setFluxWeightProducer(std::string s) { _fw_producer = s; }
@@ -63,25 +68,33 @@ public:
   void setMCShowerProducer(std::string s) { _mcshw_producer = s; }
   void setMCTrackProducer(std::string s) { _mctrk_producer = s; }
 
+  void setShowerEnergyResolution(float, bool);
+  void setTrackEnergyResolution(float, bool);
+  float nextShowerEnergyDistortion(float);
+  float nextTrackEnergyDistortion(float);
+
+  void setAcceptP(bool, int);
+  void setAcceptNTrk(bool b) { _accept_ntrk = b; }
+
   // Set a numeric dataset ID, which is written into the tree as a tag
   void setDatasetID(int id) { _dataset_id = id; }
 
-  // Utility function to test if a list of particles is 1l1p
-  static bool is1l1p(std::vector<PIDParticle>& p, int lpdg);
+  // Utility function to test if a list of particles is 1lip
+  bool is1lip(std::vector<PIDParticle>& p, int lpdg);
 
   // Apply track cuts
-  static inline bool goodTrack(const sim::MCTrack& t, const simb::MCTruth& truth) {
+  static inline bool goodTrack(const sim::MCTrack& t, const simb::MCTruth& truth, float energy_distortion=0.) {
     return (!t.empty() &&
             tsutil::isFromNuVertex(truth, t) &&
             t.Process() == "primary" &&
-            t.Start().E() - tsutil::get_pdg_mass(t.PdgCode()) >= 60);
+            t.Start().E() - tsutil::get_pdg_mass(t.PdgCode()) + energy_distortion >= 60);
   }
 
   // Apply shower cuts
-  static inline bool goodShower(const sim::MCShower& s, const simb::MCTruth& truth) {
+  static inline bool goodShower(const sim::MCShower& s, const simb::MCTruth& truth, float energy_distortion=0.) {
     return (tsutil::isFromNuVertex(truth, s) &&
             s.Process() == "primary" &&
-            s.Start().E() - tsutil::get_pdg_mass(s.PdgCode()) >= 30);
+            (s.Start().E() - tsutil::get_pdg_mass(s.PdgCode())) + energy_distortion >= 30);
   }
 
   // A structure used to hold TTree output
@@ -99,8 +112,8 @@ public:
     int int_mode;
     bool ccnc;
     double eccqe;
-    double ep;
-    int ppdg;
+    std::vector<double> eps;
+    std::vector<int> ppdgs;
     double elep;
     double thetalep;
     double philep;
@@ -111,6 +124,32 @@ public:
     double bnbweight;
     int dataset;
     std::map<std::string, std::vector<double> >* weights;
+  };
+
+  // structure to hold bokkeeping data
+  struct HeaderData {
+    // Data product producers
+    std::string track_producer;
+    std::string fw_producer;
+    std::string ew_producer;
+    std::string mct_producer;
+    std::string mcf_producer;
+    std::string mctrk_producer;
+    std::string mcshw_producer;
+    
+    // Optionally set some energy resolution
+    float shower_energy_resolution;
+    bool shower_energy_by_percent;
+    float track_energy_resolution;
+    bool track_energy_by_percent;
+    
+    // turn on/off different types of selections
+    bool accept_1p;
+    bool accept_np;
+    bool accept_ntrk;
+    
+    // input files
+    std::vector<std::string> input_files;  
   };
 
 protected:
@@ -131,6 +170,21 @@ protected:
   size_t good_1m1p;
   size_t miss_1m1p;
 
+  // Optionally set some energy resolution
+  float _shower_energy_resolution;
+  bool _shower_energy_by_percent;
+  std::normal_distribution<float> _shower_energy_distribution;
+  float _track_energy_resolution;
+  bool _track_energy_by_percent;
+  std::normal_distribution<float> _track_energy_distribution;
+  // random stuff
+  std::mt19937 _gen;
+
+  // turn on/off different types of selections
+  bool _accept_1p;
+  bool _accept_np;
+  bool _accept_ntrk;
+
   bool _verbose;  //!< Print verbose output
   int _dataset_id;  //!< An arbitrary numeric ID
   OutputData* _data;  //!< Output data
@@ -138,6 +192,12 @@ protected:
 
   TNtuple* _truthtree;
   TNtuple* _mectree;
+
+  // input files
+  std::vector<std::string> _input_files;
+
+  // output file
+  TFile* _fout;
 
   TFile* _pdf_file;  //!< File containing dE/dx PDFs
   std::map<int, TH2F*> _trackdedxs;  // Track dE/dx distributions
