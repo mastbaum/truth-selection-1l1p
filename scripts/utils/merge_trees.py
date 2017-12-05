@@ -30,7 +30,7 @@ def loop_merge(source_dir, dir_name, temp_dir, n_selections, append, final_name,
             t_list_per_selection[i].Add(data_tree_list_per_selection[i][-1])
 
         merge_count += 1
-        max_n_merge = 400 / n_selections
+        max_n_merge = 10 / n_selections
         if (dir_name + 1) % max((max_n_merge / 10),1) == 0:
             print "Processed %i files" % ((dir_name + 1) * n_selections)
             print "AT DIRECTORY: %i" % dir_name
@@ -47,19 +47,19 @@ def loop_merge(source_dir, dir_name, temp_dir, n_selections, append, final_name,
 		data_tree = last_file.Get("data")
 		t_list_per_selection[i].Add(data_tree)
 		
-		header = file_list_per_selection[i][-1].Get("header")
+                header_file = file_list_per_selection[i][-1]
 		
 		temp_file_b = temp_dir + "temp%iB" % i + final_name
-		merge_and_write(t_list_per_selection[i], header, temp_file_b)
+		merge_and_write(t_list_per_selection[i], header_file, temp_file_b)
 		
 		last_file.Close()
     else:
         print "MERGE AND WRITE"
         for i in range(n_selections):
             if file_list_per_selection[i][-1] is not None:
-		header = file_list_per_selection[i][-1].Get("header")
+                header_file = file_list_per_selection[i][-1]
 		temp_file_b = temp_dir + "temp%iB" % i + final_name
-		merge_and_write(t_list_per_selection[i], header, temp_file_b)
+		merge_and_write(t_list_per_selection[i], header_file, temp_file_b)
 
     print "CLOSING FILES"
     [[f.Close() for f in lst if f is not None] for lst in file_list_per_selection]
@@ -84,14 +84,15 @@ def open_root(fname):
         return None
     return f
 
-def merge_and_write(t_list, header, f_out_name):
+def merge_and_write(t_list, header_file, f_out_name):
     f_out = ROOT.TFile(f_out_name, "RECREATE")
     f_out.cd()
     merged = ROOT.TTree.MergeTrees(t_list)
     merged.SetName("data")
+    header = header_file.Get("header")
 
     merged.Write()
-    header.Write()
+    header.CloneTree().Write()
     f_out.Close()
 
 def main(source_dir, output_dir, identifier, temp_dir, n_selections, min_dir, max_dir):
