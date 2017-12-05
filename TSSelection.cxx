@@ -41,6 +41,22 @@ void TSSelection::setTrackEnergyResolution(float res, bool by_percent) {
   _track_energy_distribution = std::normal_distribution<float>(0., res);
 }
 
+void TSSelection::setShowerAngleResolution(float res, bool by_percent) {
+  _shower_angle_resolution = res;
+  _shower_angle_by_percent = by_percent;
+  _shower_angle_distribution = std::normal_distribution<float>(0., res);
+}
+
+void TSSelection::setTrackAngleResolution(float res, bool by_percent) {
+  _track_angle_resolution = res;
+  _track_angle_by_percent = by_percent;
+  _track_angle_distribution = std::normal_distribution<float>(0., res);
+}
+
+void TSSelection::setTrackShowerConfusion(float percent) {
+  _track_shower_confusion_distribution = std::bernoulli_distribution(percent);
+}
+
 void TSSelection::setAcceptP(bool b, int n_protons) {
   if (n_protons == 1)
     _accept_1p = b;
@@ -70,28 +86,62 @@ float TSSelection::nextShowerEnergyDistortion(float this_energy=0.) {
   }
 }
 
-bool TSSelection::is1lip(std::vector<PIDParticle>& p, int lpdg) {
+float TSSelection::nextTrackAngleDistortion(float this_angle=0.) {
+  if (_track_angle_resolution < 1e-4) 
+    return 0.;
+  if (_track_angle_by_percent) {
+    return _track_angle_distribution(_gen) * this_angle;
+  }
+  else {
+    return _track_angle_distribution(_gen);
+  }
+}
+
+bool TSSelection::nextTrackShowerConfusion() {
+  if (_track_shower_confusion < 1e-4)
+    return false;
+  else 
+    return _track_shower_confusion_distribution(_gen);
+}
+
+float TSSelection::nextShowerAngleDistortion(float this_angle=0.) {
+  if (_shower_angle_resolution < 1e-4) 
+    return 0.;
+  if (_shower_angle_by_percent) {
+    return _shower_angle_distribution(_gen) * this_angle;
+  }
+  else {
+    return _shower_angle_distribution(_gen);
+  }
+}
+
+bool TSSelection::pass_selection(std::vector<PIDParticle>& p, int lpdg) {
   // Count protons and the chosen lepton type
   size_t np = 0;
   size_t nl = 0;
+  size_t n_trk = 0;
   for (size_t i=0; i<p.size(); i++) {
     if (p[i].pdg == 2212) {
       np++;
+      n_trk ++;
+    }
+    // test for charged pions (the only other possible track?)
+    if (abs(p[i].pdg) == 211) {
+      n_trk++;
     }
     if (p[i].pdg == lpdg) {
       nl++;
     }
   }
 
-  bool n_protons_good = false;
-  if (_accept_1p && np == 1)
-    n_protons_good = true;
-  else if (_accept_np && np > 1)
-    n_protons_good = true;
 
-  // always require one lepton
-  // there should only be one lepton + whatever many protons we accept
-  return n_protons_good && nl == 1 && nl + np == p.size();
+  bool pass_1l1p = nl == 1 && np == 1 && nl + np == p.size();
+  bool pass_1lnp = nl == 1 && nl + np == p.size();
+  bool pass_1lntrk = nl == 1 && nl + n_trk == p.size();
+
+  return (pass_1l1p && _accept_1p) 
+      || (pass_1lnp && _accept_np) 
+      || (pass_1lntrk && _accept_ntrk);
 }
 
 
@@ -137,6 +187,9 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
   good_1m1p = 0;
   miss_1m1p = 0;
 
+  // set producer to null
+  _ew_producer = "";
+
   // initialize resolutions to 0 (perfect resolution)
   _shower_energy_resolution = 0.;
   _track_energy_resolution = 0.;
@@ -144,6 +197,16 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
   _track_energy_by_percent = false;
   _shower_energy_distribution = std::normal_distribution<float>(0.0, 0.0);
   _track_energy_distribution = std::normal_distribution<float>(0.0, 0.0);
+
+  _shower_angle_resolution = 0.;
+  _track_angle_resolution = 0.;
+  _shower_angle_by_percent = false;
+  _track_angle_by_percent = false;
+  _shower_angle_distribution = std::normal_distribution<float>(0.0, 0.0);
+  _track_angle_distribution = std::normal_distribution<float>(0.0, 0.0);
+
+  _track_shower_confusion = 0.;
+  _track_shower_confusion_distribution = std::bernoulli_distribution();
 
   _accept_1p = true;
   _accept_ntrk = false;
@@ -186,6 +249,9 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
   _truthtree = new TNtuple("truth", "", "nupdg:enu:ccnc:int:mode:w:q2:lpdg:elep:tlep:npip:npim:npi0:np:nn:fw:ttrk:rtrk:texit:tshr:rshr:sexit");
   _mectree = new TNtuple("mec", "", "nupdg:enu:ccnc:mode:w:q2:lpdg:tlep:ep0:ep1:ep2:ep3:ep4");
 
+  _record_truth = true;
+  _record_mec = true;
+
   return true;
 }
 
@@ -204,9 +270,12 @@ bool TSSelection::analyze(gallery::Event* ev) {
   auto const& gtruth_list = \
     (*ev->getValidHandle<std::vector<simb::GTruth> >(gtruth_tag));
 
-  art::InputTag eventweight_tag(_ew_producer);
-  auto const& eventweights_list = \
+  std::vector<evwgh::MCEventWeight> eventweights_list;
+  if (_ew_producer.size() > 0) { 
+    art::InputTag eventweight_tag(_ew_producer);
+    eventweights_list = \
     (*ev->getValidHandle<std::vector<evwgh::MCEventWeight> >(eventweight_tag));
+  }
 
   art::InputTag mctruth_tag(_mct_producer);
   auto const& mctruth_list = \
@@ -245,12 +314,14 @@ bool TSSelection::analyze(gallery::Event* ev) {
     // Get vertex-associated contained tracks
     for (size_t j=0; j<mctrack_list.size(); j++) {
       const sim::MCTrack& mct = mctrack_list.at(j);
-
+      
+      float this_angle = mct.Start().Momentum().Theta();
       float this_energy = mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode());
       float energy_distortion = nextTrackEnergyDistortion( this_energy );
+      float angle_distortion = nextTrackAngleDistortion(this_angle);
 
       // Apply track cuts
-      if (!goodTrack(mct, mctruth, energy_distortion)) {
+      if (!goodTrack(mct, mctruth, energy_distortion, angle_distortion)) {
         continue;
       }
 
@@ -302,12 +373,14 @@ bool TSSelection::analyze(gallery::Event* ev) {
         pdg_best = 2212;
       }
 
+      auto new_momentum = TLorentzVector(mct.Start().Momentum());
+      new_momentum.SetTheta(this_angle + angle_distortion);
       particles_found.push_back({
         pdg_best,
         mct.PdgCode(),
-        mct.Start().Momentum(),
+        new_momentum,
         mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()) + energy_distortion,
-        tsutil::eccqe(mct.Start().Momentum(), energy_distortion),
+        tsutil::eccqe(mct.Start().Momentum(), energy_distortion, angle_distortion),
         s,
         !tsutil::inFV(mct)
       });
@@ -349,7 +422,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
         // @ANDY: IS THIS A BUG???
         // previous lines have this energy as:
         // mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode())
-        mcs.Start().E() + energy_distortion,
+        // note: fixed
+        mcs.Start().E() + energy_distortion - tsutil::get_pdg_mass(mcs.PdgCode()),
         tsutil::eccqe(mcs.Start().Momentum(), energy_distortion),
         -1,
         !tsutil::inFV(mcs)
@@ -359,10 +433,10 @@ bool TSSelection::analyze(gallery::Event* ev) {
     // Classify the event (found/true 1lip/1m1p)
     // "True" good_event here means there are one true l and one true p that pass the
     // track/shower cuts (i.e. are in within this specific signal definition).
-    bool f_1e1p = is1lip(particles_found, 11);
-    bool t_1e1p = is1lip(particles_true, 11);
-    bool f_1m1p = is1lip(particles_found, 13);
-    bool t_1m1p = is1lip(particles_true, 13);
+    bool f_1e1p = pass_selection(particles_found, 11);
+    bool t_1e1p = pass_selection(particles_true, 11);
+    bool f_1m1p = pass_selection(particles_found, 13);
+    bool t_1m1p = pass_selection(particles_true, 13);
 
     // Where have all the muons gone?
     //if (t_1m1p && !f_1m1p) {
@@ -463,64 +537,68 @@ bool TSSelection::analyze(gallery::Event* ev) {
 
 
     // Fill the event truth tree
-    float vtt[22] = {
-      (float) mctruth.GetNeutrino().Nu().PdgCode(),
-      (float) mctruth.GetNeutrino().Nu().E(),
-      (float) mctruth.GetNeutrino().CCNC(),
-      (float) mctruth.GetNeutrino().InteractionType(),
-      (float) mctruth.GetNeutrino().Mode(),
-      (float) mctruth.GetNeutrino().W(),
-      (float) mctruth.GetNeutrino().QSqr(),
-      (float) mctruth.GetNeutrino().Lepton().PdgCode(),
-      (float) mctruth.GetNeutrino().Lepton().E(),
-      (float) gtruth.fGint,
-      (float) gtruth.fNumPiPlus,
-      (float) gtruth.fNumPiMinus,
-      (float) gtruth.fNumPi0,
-      (float) gtruth.fNumProton,
-      (float) gtruth.fNumNeutron,
-      (float) wbnb,
-      (float) mctrack_list.size(),
-      (float) ntracks,
-      (float) 0,
-      (float) mcshower_list.size(),
-      (float) nshowers,
-      (float) 0
-    };
-    _truthtree->Fill(vtt);
-
-    // Fill tree for MEC events with sorted proton energies
-    if (mctruth.GetNeutrino().Mode() == simb::kMEC) {
-      std::vector<float> epmec(5, -1);
-      for (size_t k=0; k<mctrack_list.size(); k++) {
-        const sim::MCTrack& t = mctrack_list[k];
-        if (t.PdgCode() == 2212 && t.Process() == "primary") {
-          double ke = t.Start().E() - tsutil::get_pdg_mass(t.PdgCode());
-          epmec.push_back(ke);
-        }
-      }
-
-      std::sort(epmec.begin(), epmec.end(), std::greater<>());
-
-      float v2[13] = {
-        (float) mctruth.GetNeutrino().Nu().PdgCode(),
-        (float) mctruth.GetNeutrino().Nu().E(),
-        (float) mctruth.GetNeutrino().CCNC(),
-        (float) mctruth.GetNeutrino().Mode(),
-        (float) mctruth.GetNeutrino().W(),
-        (float) mctruth.GetNeutrino().QSqr(),
-        (float) mctruth.GetNeutrino().Lepton().PdgCode(),
-        (float) mctruth.GetNeutrino().Lepton().E(),
-        (float) epmec[0],
-        (float) epmec[1],
-        (float) epmec[2],
-        (float) epmec[3],
-        (float) epmec[4]
+    if (_record_truth) {
+      float vtt[22] = {
+	(float) mctruth.GetNeutrino().Nu().PdgCode(),
+	(float) mctruth.GetNeutrino().Nu().E(),
+	(float) mctruth.GetNeutrino().CCNC(),
+	(float) mctruth.GetNeutrino().InteractionType(),
+	(float) mctruth.GetNeutrino().Mode(),
+	(float) mctruth.GetNeutrino().W(),
+	(float) mctruth.GetNeutrino().QSqr(),
+	(float) mctruth.GetNeutrino().Lepton().PdgCode(),
+	(float) mctruth.GetNeutrino().Lepton().E(),
+	(float) gtruth.fGint,
+	(float) gtruth.fNumPiPlus,
+	(float) gtruth.fNumPiMinus,
+	(float) gtruth.fNumPi0,
+	(float) gtruth.fNumProton,
+	(float) gtruth.fNumNeutron,
+	(float) wbnb,
+	(float) mctrack_list.size(),
+	(float) ntracks,
+	(float) 0,
+	(float) mcshower_list.size(),
+	(float) nshowers,
+	(float) 0
       };
-      _mectree->Fill(v2);
+      _truthtree->Fill(vtt);
+    }
+
+
+    if (_record_mec) {
+      // Fill tree for MEC events with sorted proton energies
+      if (mctruth.GetNeutrino().Mode() == simb::kMEC) {
+        std::vector<float> epmec(5, -1);
+        for (size_t k=0; k<mctrack_list.size(); k++) {
+          const sim::MCTrack& t = mctrack_list[k];
+          if (t.PdgCode() == 2212 && t.Process() == "primary") {
+            double ke = t.Start().E() - tsutil::get_pdg_mass(t.PdgCode());
+            epmec.push_back(ke);
+          }
+        }
+
+        std::sort(epmec.begin(), epmec.end(), std::greater<>());
+
+        float v2[13] = {
+	  (float) mctruth.GetNeutrino().Nu().PdgCode(),
+	  (float) mctruth.GetNeutrino().Nu().E(),
+	  (float) mctruth.GetNeutrino().CCNC(),
+	  (float) mctruth.GetNeutrino().Mode(),
+	  (float) mctruth.GetNeutrino().W(),
+	  (float) mctruth.GetNeutrino().QSqr(),
+	  (float) mctruth.GetNeutrino().Lepton().PdgCode(),
+	  (float) mctruth.GetNeutrino().Lepton().E(),
+	  (float) epmec[0],
+	  (float) epmec[1],
+	  (float) epmec[2],
+	  (float) epmec[3],
+	  (float) epmec[4]
+        };
+        _mectree->Fill(v2);
+      }
     }
   }
-
   return true;
 }
 
@@ -572,6 +650,11 @@ bool TSSelection::finalize() {
   header_tree->Branch("track_energy_resolution", &to_header->track_energy_resolution);
   header_tree->Branch("track_energy_by_percent", &to_header->track_energy_by_percent);
 
+  header_tree->Branch("shower_angle_resolution", &to_header->shower_angle_resolution);
+  header_tree->Branch("shower_angle_by_percent", &to_header->shower_angle_by_percent);
+  header_tree->Branch("track_angle_resolution", &to_header->track_angle_resolution);
+  header_tree->Branch("track_angle_by_percent", &to_header->track_angle_by_percent);
+
   header_tree->Branch("accept_1p", &to_header->accept_1p);
   header_tree->Branch("accept_np", &to_header->accept_np);
   header_tree->Branch("accept_ntrk", &to_header->accept_ntrk);
@@ -589,6 +672,11 @@ bool TSSelection::finalize() {
   header.shower_energy_by_percent = _shower_energy_by_percent;
   header.track_energy_resolution = _track_energy_resolution;
   header.track_energy_by_percent = _track_energy_by_percent;
+
+  header.shower_angle_resolution = _shower_angle_resolution;
+  header.shower_angle_by_percent = _shower_angle_by_percent;
+  header.track_angle_resolution = _track_angle_resolution;
+  header.track_angle_by_percent = _track_angle_by_percent;
 
   header.accept_1p = _accept_1p;
   header.accept_np = _accept_np;

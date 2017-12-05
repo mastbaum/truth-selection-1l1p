@@ -48,7 +48,7 @@ bool isFromNuVertex(const simb::MCTruth& mc, const sim::MCTrack& track,
 }
 
 
-double eccqe(const TLorentzVector& v, float energy_distortion) {
+double eccqe(const TLorentzVector& inp_v, float energy_distortion, float angle_distortion) {
   double e_dist = (double) energy_distortion;
   // Based on D. Kaleko, LowEnergyExcess LArLite module ECCQECalculator
   double M_n = 939.565; // MeV/c^2
@@ -59,6 +59,10 @@ double eccqe(const TLorentzVector& v, float energy_distortion) {
   double mp2 = M_p * M_p;
   double me2 = M_e * M_e;
   double mnb = M_n - bindingE;
+
+  // mess around with lorentz vector
+  TLorentzVector v(inp_v);
+  v.SetTheta( v.Theta() + angle_distortion);
 
   double l_energy = v.E() + e_dist;
 

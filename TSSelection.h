@@ -73,6 +73,14 @@ public:
   float nextShowerEnergyDistortion(float);
   float nextTrackEnergyDistortion(float);
 
+  void setShowerAngleResolution(float, bool);
+  void setTrackAngleResolution(float, bool);
+  float nextShowerAngleDistortion(float);
+  float nextTrackAngleDistortion(float);
+
+  void setTrackShowerConfusion(float);
+  bool nextTrackShowerConfusion();
+
   void setAcceptP(bool, int);
   void setAcceptNTrk(bool b) { _accept_ntrk = b; }
 
@@ -80,10 +88,10 @@ public:
   void setDatasetID(int id) { _dataset_id = id; }
 
   // Utility function to test if a list of particles is 1lip
-  bool is1lip(std::vector<PIDParticle>& p, int lpdg);
+  bool pass_selection(std::vector<PIDParticle>& p, int lpdg); 
 
   // Apply track cuts
-  static inline bool goodTrack(const sim::MCTrack& t, const simb::MCTruth& truth, float energy_distortion=0.) {
+  static inline bool goodTrack(const sim::MCTrack& t, const simb::MCTruth& truth, float energy_distortion=0., float angle_distortion=0.) {
     return (!t.empty() &&
             tsutil::isFromNuVertex(truth, t) &&
             t.Process() == "primary" &&
@@ -91,7 +99,7 @@ public:
   }
 
   // Apply shower cuts
-  static inline bool goodShower(const sim::MCShower& s, const simb::MCTruth& truth, float energy_distortion=0.) {
+  static inline bool goodShower(const sim::MCShower& s, const simb::MCTruth& truth, float energy_distortion=0., float angle_distortion=0.) {
     return (tsutil::isFromNuVertex(truth, s) &&
             s.Process() == "primary" &&
             (s.Start().E() - tsutil::get_pdg_mass(s.PdgCode())) + energy_distortion >= 30);
@@ -142,6 +150,12 @@ public:
     bool shower_energy_by_percent;
     float track_energy_resolution;
     bool track_energy_by_percent;
+    // and angle distortion
+    float shower_angle_resolution;
+    bool shower_angle_by_percent;
+    float track_angle_resolution;
+    bool track_angle_by_percent;
+    
     
     // turn on/off different types of selections
     bool accept_1p;
@@ -177,6 +191,18 @@ protected:
   float _track_energy_resolution;
   bool _track_energy_by_percent;
   std::normal_distribution<float> _track_energy_distribution;
+  // and angular resolution
+  float _shower_angle_resolution;
+  bool _shower_angle_by_percent;
+  std::normal_distribution<float> _shower_angle_distribution;
+  float _track_angle_resolution;
+  bool _track_angle_by_percent;
+  std::normal_distribution<float> _track_angle_distribution;
+
+  // track-shower confusion
+  float _track_shower_confusion;
+  std::bernoulli_distribution _track_shower_confusion_distribution;
+
   // random stuff
   std::mt19937 _gen;
 
@@ -198,6 +224,9 @@ protected:
 
   // output file
   TFile* _fout;
+  // whether to record truth level data
+  bool _record_truth;
+  bool _record_mec;
 
   TFile* _pdf_file;  //!< File containing dE/dx PDFs
   std::map<int, TH2F*> _trackdedxs;  // Track dE/dx distributions
