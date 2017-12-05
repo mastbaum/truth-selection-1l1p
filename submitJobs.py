@@ -9,10 +9,10 @@ import itertools
 
 parser = argparse.ArgumentParser(description='Submit beam data jobs.')
 
-parser.add_argument("-f", "--first-run", dest="firstrun",
+parser.add_argument("-f", "--first-file", dest="firstfile",
                     required=True,
                     help="First run.")
-parser.add_argument("-l", "--last-run", dest="lastrun",
+parser.add_argument("-l", "--last-file", dest="lastfile",
                     required=True,
                     help="Last run.")
 parser.add_argument("-i", "--input-file-list", dest="f_list_name",
@@ -23,6 +23,8 @@ parser.add_argument("-o", "--output-path", dest="outputpath",
                     help="Path where to copy final output. (default=/pnfs/uboone/scratch/users/%s/bnb_redecay_to_gsimple)"%os.environ['USER'])
 parser.add_argument("-d", "--debug",action='store_true',
                     help="Will not delete submission files in the end. Useful for debugging and will only print the submission command on screen.")
+parser.add_argument("-n", "--n_files_per_run", type=int, default=1)
+parser.add_argument("-r", "--run_no", type=int, default=0)
 
 parser.add_argument("-t", "--track_energy_distortion", type=float, nargs="+")
 parser.add_argument("-s", "--shower_energy_distortion", type=float, nargs="+")
@@ -52,7 +54,7 @@ n_selections = 1 if track_energy_distortion is None else len(track_energy_distor
 tarfilename="jobfiles_%i.tar.bz2"%os.getpid()
 outtar = tarfile.open(tarfilename, mode='w:bz2')
 outtar.add(args.f_list_name, arcname=args.f_list_name)
-outtar.add("truth_selection_multiple_selections",arcname="truth_selection")
+outtar.add("truth_selection",arcname="truth_selection")
 outtar.add("data/dedx_pdfs.root", arcname="dedx_pdfs.root")
 outtar.close()
 
@@ -86,7 +88,9 @@ ofstr='''
 
 export _RUN_NUMBER=$((PROCESS+%(firstrun)s))
 
-export THISFILE=$(sed "$((_RUN_NUMBER+1))q;d" %(f_list_name)s)
+#export THESFILE=$(sed -n "$((_RUN_NUMBER+1))q;d" %(f_list_name)s)
+export MINFILENO=$((%(min_file_no)s+1+$PROCESS*%(files_per_job)s))
+export THESEFILES=$(sed -n "$MINFILENO,$(($MINFILENO+%(files_per_job)s-1))p" %(f_list_name)s)
 
 echo "RunArgs: " >>${_RUN_NUMBER}.out 2>&1
 echo "%(args)s" >>${_RUN_NUMBER}.out 2>&1
@@ -116,16 +120,24 @@ tar -jvxf `basename ${INPUT_TAR_FILE}` >>${_RUN_NUMBER}.out 2>&1
 
 echo $THISFILE >>${_RUN_NUMBER}.out 2>&1
 
+export FILES=($THESEFILES)
 echo " Copying File...." >>${_RUN_NUMBER}.out 2>&1
-ifdh cp $THISFILE ${PWD}/test.root >>${_RUN_NUMBER}.out 2>&1
+
+export FILELIST=""
+for file in "${FILES[@]}"
+do 
+    ifdh cp $file ${PWD}/$(basename $file) >>${_RUN_NUMBER}.out 2>&1
+    FILELIST="$FILELIST $(basename $file)"
+done
 
 echo "What's in here? "
 ls >>${_RUN_NUMBER}.out 2>&1
 
 echo " Run time! " >>${_RUN_NUMBER}.out 2>&1
 echo "With args: %(args)s" >>${_RUN_NUMBER}.out 2>&1
+echo "With Input Files: ${FILELIST}" >>${_RUN_NUMBER}.out 2>&1
 
-./truth_selection test.root %(args)s >>${_RUN_NUMBER}.out 2>&1
+./truth_selection $FILELIST %(args)s >>${_RUN_NUMBER}.out 2>&1
 
 mkdir ${_RUN_NUMBER}
 
@@ -139,16 +151,19 @@ ifdh mkdir %(outputdir)s/
 ifdh mkdir %(outputdir)s/${_RUN_NUMBER}
 ifdh cp -r ${_RUN_NUMBER} %(outputdir)s/${_RUN_NUMBER}/
 
-'''%{'firstrun':args.firstrun,'outputdir':args.outputpath, 'args': truth_selection_args, 'f_list_name': args.f_list_name,'max_i_selection':n_selections-1}
+'''%{'firstrun':args.run_no,'min_file_no':args.firstfile,'outputdir':args.outputpath, 'args': truth_selection_args, 'f_list_name': args.f_list_name,'max_i_selection':n_selections-1,'files_per_job':args.n_files_per_run}
 
 runjobfname="runjob_%i.sh"%os.getpid()
 of=open(runjobfname,'w')
 of.write(ofstr)
 of.close()
 
-n_jobs = int(args.lastrun)-int(args.firstrun)+1
+n_files = int(args.lastfile)-int(args.firstfile)+1
+n_jobs = n_files / args.n_files_per_run
+if n_files % args.n_files_per_run != 0:
+    n_jobs += 1
 
-cmd="jobsub_submit --memory=1000MB --group=uboone -N %i --tar_file_name=dropbox://%s file://%s"%(int(args.lastrun)-int(args.firstrun)+1,os.path.abspath(tarfilename),os.path.abspath(runjobfname))
+cmd="jobsub_submit --memory=1000MB --disk=66GB --group=uboone -N %i --tar_file_name=dropbox://%s file://%s"%(n_jobs,os.path.abspath(tarfilename),os.path.abspath(runjobfname))
 
 if (not args.debug):
     print "Running submit cmd:"
