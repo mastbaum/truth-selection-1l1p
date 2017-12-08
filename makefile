@@ -11,7 +11,7 @@ CPPFLAGS=-I $(BOOST_INC) \
          -I ${UBOONECODE_INC} \
          $(shell root-config --cflags)
 
-CXXFLAGS=-std=c++14 -Wall -pedantic -Werror
+CXXFLAGS=-std=c++14 -Wall -pedantic
 CXX=g++
 LDFLAGS=$(shell root-config --libs) \
         -L $(CANVAS_LIB) -l canvas \
@@ -41,6 +41,6 @@ $(EXEC): $(OBJECTS)
 	@$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $< -o $@
 
 clean:
-	rm $(EXEC)
+	rm $(EXEC) $(OBJECTS)
 
 
