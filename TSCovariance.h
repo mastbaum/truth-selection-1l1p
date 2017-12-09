@@ -20,6 +20,10 @@ public:
   void AddWeight(std::string w);
   void SetScaleFactorE(double _sf) { fScaleFactorE = _sf; }
   void SetScaleFactorMu(double _sf) { fScaleFactorMu = _sf; }
+  void SetEEfficiencyBins(std::vector<float> bins);
+  void SetAEfficiencyBins(std::vector<float> bins);
+  void SetEfficiencies(std::vector<float> eff);
+  float GetEffWeight(float energy, float angle);
   void SetSeed(int _seed) { fSeed = _seed; }
   int WriteSystPlots(char* filename);
 
@@ -101,6 +105,11 @@ private:
   double fScaleFactorE;  //!< POT scaling, etc.
   double fScaleFactorMu;  //!< POT scaling, etc.
   int fSeed;  //!< Random seed for ROOT
+
+  // efficiencies from energy, angle
+  std::vector<float> _energy_efficiency_bins;
+  std::vector<float> _angle_efficiency_bins;
+  std::vector<float> _efficiencies;
 
   // whether to use the ccqe energy as the variable
   // if set to false, uses the lepton + proton (shower + track) energy
