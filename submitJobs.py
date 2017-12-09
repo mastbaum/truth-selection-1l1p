@@ -55,7 +55,7 @@ tarfilename="jobfiles_%i.tar.bz2"%os.getpid()
 outtar = tarfile.open(tarfilename, mode='w:bz2')
 outtar.add(args.f_list_name, arcname=args.f_list_name)
 outtar.add("truth_selection",arcname="truth_selection")
-outtar.add("data/dedx_pdfs.root", arcname="dedx_pdfs.root")
+outtar.add("dedx_pdfs.root", arcname="dedx_pdfs.root")
 outtar.close()
 
 truth_selection_args = ""
@@ -101,16 +101,15 @@ echo "Process: " ${PROCESS} >>${_RUN_NUMBER}.out 2>&1
 
 echo " Sourcing everything...." >>${_RUN_NUMBER}.out 2>&1
 
-#source /cvmfs/fermilab.opensciencegrid.org/products/common/etc/setup >>${_RUN_NUMBER}.out 2>&1
-#source /cvmfs/uboone.opensciencegrid.org/products/setup_uboone.sh >>${_RUN_NUMBER}.out 2>&1
-#source /cvmfs/fermilab.opensciencegrid.org/products/larsoft/setup >>${_RUN_NUMBER}.out 2>&1
-
 source /grid/fermiapp/products/uboone/setup_uboone.sh >>${_RUN_NUMBER}.out 2>&1
 source /cvmfs/fermilab.opensciencegrid.org/products/common/etc/setup >>${_RUN_NUMBER}.out 2>&1
 source /cvmfs/fermilab.opensciencegrid.org/products/larsoft/setup >>${_RUN_NUMBER}.out 2>&1
 
-setup larsoftobj v1_13_00 -q e10:prof && echo "Setup Larsoftobj" >>${_RUN_NUMBER}.out 2>&1
-setup uboonecode v06_26_01_07 -q e10:prof && echo "Setup Uboonecode" >>${_RUN_NUMBER}.out 2>&1
+#setup larsoftobj v1_13_00 -q e10:prof && echo "Setup Larsoftobj" >>${_RUN_NUMBER}.out 2>&1
+#setup uboonecode v06_26_01_07 -q e10:prof && echo "Setup Uboonecode" >>${_RUN_NUMBER}.out 2>&1
+
+setup gallery v1_05_03 -q prof:e14:nu
+setup uboonecode v06_55_00 -q prof:e14
 
 mv ${_RUN_NUMBER}.out ${_CONDOR_SCRATCH_DIR}/.
 cd ${_CONDOR_SCRATCH_DIR}
@@ -126,9 +125,10 @@ echo " Copying File...." >>${_RUN_NUMBER}.out 2>&1
 export FILELIST=""
 for file in "${FILES[@]}"
 do 
-    ifdh cp $file ${PWD}/$(basename $file) >>${_RUN_NUMBER}.out 2>&1
+    echo "$file ${PWD}/$(basename $file)" >> filelist
     FILELIST="$FILELIST $(basename $file)"
 done
+ifdh cp -f filelist
 
 echo "What's in here? "
 ls >>${_RUN_NUMBER}.out 2>&1
@@ -147,7 +147,6 @@ do
   cp out${i}.root ${_RUN_NUMBER}/.
 done
 
-ifdh mkdir %(outputdir)s/
 ifdh mkdir %(outputdir)s/${_RUN_NUMBER}
 ifdh cp -r ${_RUN_NUMBER} %(outputdir)s/${_RUN_NUMBER}/
 
@@ -163,7 +162,7 @@ n_jobs = n_files / args.n_files_per_run
 if n_files % args.n_files_per_run != 0:
     n_jobs += 1
 
-cmd="jobsub_submit --memory=1000MB --disk=66GB --group=uboone -N %i --tar_file_name=dropbox://%s file://%s"%(n_jobs,os.path.abspath(tarfilename),os.path.abspath(runjobfname))
+cmd="jobsub_submit --memory=1000MB --disk=10GB --group=uboone -N %i --tar_file_name=dropbox://%s file://%s"%(n_jobs,os.path.abspath(tarfilename),os.path.abspath(runjobfname))
 
 if (not args.debug):
     print "Running submit cmd:"
