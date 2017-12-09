@@ -320,7 +320,11 @@ bool TSSelection::analyze(gallery::Event* ev) {
       float energy_distortion = nextTrackEnergyDistortion( this_energy );
       float angle_distortion = nextTrackAngleDistortion(this_angle);
 
-      // Apply track cuts
+      bool isEmpty = mct.empty();
+      bool isFromNuVertex = tsutil::isFromNuVertex(mctruth, mct);
+      bool isPrimaryProces = mct.Process() == "primary";
+
+      // Apply track cuts for truth information
       if (!goodTrack(mct, mctruth, energy_distortion, angle_distortion)) {
         continue;
       }
@@ -393,6 +397,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
 
       float this_energy = mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode());
       float energy_distortion = nextShowerEnergyDistortion( this_energy );
+      float this_angle = mcs.Start().Momentum().Theta();
+      float angle_distortion = nextTrackAngleDistortion(this_angle);
 
       // Apply shower cuts
       if (!goodShower(mcs, mctruth, energy_distortion)) {
@@ -415,16 +421,18 @@ bool TSSelection::analyze(gallery::Event* ev) {
       // Guess the PDG based on shower dE/dx (cut at 3.5)
       int pdg_best = (mcs.dEdx() < 3.5 ? 11 : 22);
 
+      TLorentzVector new_momentum(mcs.Start().Momentum());
+      new_momentum.SetTheta(this_angle + angle_distortion);
       particles_found.push_back({
         pdg_best,
         mcs.PdgCode(),
-        mcs.Start().Momentum(),
+        new_momentum,
         // @ANDY: IS THIS A BUG???
         // previous lines have this energy as:
         // mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode())
         // note: fixed
         mcs.Start().E() + energy_distortion - tsutil::get_pdg_mass(mcs.PdgCode()),
-        tsutil::eccqe(mcs.Start().Momentum(), energy_distortion),
+        tsutil::eccqe(mcs.Start().Momentum(), energy_distortion, angle_distortion),
         -1,
         !tsutil::inFV(mcs)
       });
@@ -654,7 +662,7 @@ bool TSSelection::finalize() {
   header_tree->Branch("shower_angle_by_percent", &to_header->shower_angle_by_percent);
   header_tree->Branch("track_angle_resolution", &to_header->track_angle_resolution);
   header_tree->Branch("track_angle_by_percent", &to_header->track_angle_by_percent);
-
+  
   header_tree->Branch("accept_1p", &to_header->accept_1p);
   header_tree->Branch("accept_np", &to_header->accept_np);
   header_tree->Branch("accept_ntrk", &to_header->accept_ntrk);

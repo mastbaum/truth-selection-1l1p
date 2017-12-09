@@ -98,11 +98,19 @@ public:
             t.Start().E() - tsutil::get_pdg_mass(t.PdgCode()) + energy_distortion >= 60);
   }
 
+  static inline bool goodTrack(bool isEmpty, bool isFromNuVertex, bool isPrimaryProcess, float energy) {
+    return !isEmpty && isFromNuVertex && isPrimaryProcess && energy >= 60.;
+  }
+
   // Apply shower cuts
   static inline bool goodShower(const sim::MCShower& s, const simb::MCTruth& truth, float energy_distortion=0., float angle_distortion=0.) {
     return (tsutil::isFromNuVertex(truth, s) &&
             s.Process() == "primary" &&
             (s.Start().E() - tsutil::get_pdg_mass(s.PdgCode())) + energy_distortion >= 30);
+  }
+
+  static inline bool goodShower(bool isFromNuVertex, bool isPrimaryProcess, float energy) {
+    return isFromNuVertex && isPrimaryProcess && energy >= 30;
   }
 
   // A structure used to hold TTree output
