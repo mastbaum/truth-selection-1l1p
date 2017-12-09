@@ -68,6 +68,7 @@ int main(int argv, char** argc) {
         cout << "Output File " << f_outs.size() << ": " << argc[i] << endl;
         i ++;
       }
+      continue;
     }
     if (strcmp(argc[i], "-n") == 0 || strcmp(argc[i], "--Nselections") == 0) {
       i ++;

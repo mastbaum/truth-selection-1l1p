@@ -10,8 +10,6 @@ namespace galleryfmwk {
 
 namespace tsutil {
 
-TDatabasePDG gPDGTable;
-
 // From J. Zennamo's pion selection
 const double fv_x_lo =    0.0, fv_x_hi =  256.35;
 const double fv_y_lo = -116.5, fv_y_hi =  116.50;
@@ -79,17 +77,20 @@ double eccqe(const TLorentzVector& inp_v, float energy_distortion, float angle_d
 
 
 double get_pdg_mass(const int pdg) {
+  if (!gPDGTable) {
+    gPDGTable = new TDatabasePDG;
+  }
   if (pdg < 1000000000) {
     // A regular old particle
-    TParticlePDG* ple = gPDGTable.GetParticle(pdg);
+    TParticlePDG* ple = gPDGTable->GetParticle(pdg);
     return ple->Mass() * 1000.0;
   }
   else {
     // Ion, total up proton and neutron masses
     int p = (pdg % 10000000) / 10000;
     int n = (pdg % 10000) / 10 - p;
-    return (gPDGTable.GetParticle(2212)->Mass() * p +
-            gPDGTable.GetParticle(2112)->Mass() * n) * 1000.0;
+    return (gPDGTable->GetParticle(2212)->Mass() * p +
+            gPDGTable->GetParticle(2112)->Mass() * n) * 1000.0;
   }
 }
 

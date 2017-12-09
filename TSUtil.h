@@ -21,7 +21,7 @@ namespace galleryfmwk {
 namespace tsutil {
 
 // A global ROOT PDG table
-extern TDatabasePDG gPDGTable;
+static TDatabasePDG* gPDGTable = NULL;
 
 
 // Check if shower endpoint is within the fiducial volume
