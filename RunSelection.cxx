@@ -62,11 +62,10 @@ int main(int argv, char** argc) {
   vector<string> filename;
   for (int i = 1; i < argv; ++i) {
     if (strcmp(argc[i], "-o") == 0 || strcmp(argc[i], "--output_file") == 0) {
-      i ++;
-      while (i < argv && argc[i][0] != '-') {
+      while (i+1 < argv && argc[i+1][0] != '-') {
+        i ++;
         f_outs.push_back( new TFile(argc[i], "RECREATE") );
         cout << "Output File " << f_outs.size() << ": " << argc[i] << endl;
-        i ++;
       }
       continue;
     }
