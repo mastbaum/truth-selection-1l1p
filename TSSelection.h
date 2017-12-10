@@ -84,6 +84,8 @@ public:
   void setAcceptP(bool, int);
   void setAcceptNTrk(bool b) { _accept_ntrk = b; }
 
+  void setNTrials(int n) { _n_trials = n; }
+
   // Set a numeric dataset ID, which is written into the tree as a tag
   void setDatasetID(int id) { _dataset_id = id; }
 
@@ -164,7 +166,9 @@ public:
     float track_angle_resolution;
     bool track_angle_by_percent;
     
-    
+    // numbers of things
+    int n_trials;
+ 
     // turn on/off different types of selections
     bool accept_1p;
     bool accept_np;
@@ -213,6 +217,9 @@ protected:
 
   // random stuff
   std::mt19937 _gen;
+
+  // number of times random stuff happens per event
+  int _n_trials;
 
   // turn on/off different types of selections
   bool _accept_1p;

@@ -44,6 +44,7 @@ int main(int argv, char** argc) {
 
   // All of the options
   int n_selections = 1;
+  int n_trials = 1;
   std::vector<int> dataset_id = {};
 
   std::vector<float> track_energy_distortion = {};
@@ -73,6 +74,12 @@ int main(int argv, char** argc) {
       i ++;
       n_selections = stoi(argc[i]);
       cout << "N Selections: " << n_selections << endl;
+      continue;
+    }
+    if (strcmp(argc[i], "-t") == 0 || strcmp(argc[i], "--Ntrials") == 0) {
+      i ++;
+      n_trials = stoi(argc[i]);
+      cout << "N Trials: " << n_trials << endl;
       continue;
     }
     if (strcmp(argc[i], "-d") == 0 || strcmp(argc[i], "--datasetId") == 0) {
@@ -151,7 +158,7 @@ int main(int argv, char** argc) {
     selections[i].setMCTrackProducer("mcreco");
     selections[i].setMCShowerProducer("mcreco");
     selections[i].setVerbose(true);
-    
+    selections[i].setNTrials(n_trials);
    
     if (dataset_id.size() > 0) {
         selections[i].setDatasetID( dataset_id[i] );

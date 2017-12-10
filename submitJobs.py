@@ -24,6 +24,7 @@ parser.add_argument("-o", "--output-path", dest="outputpath",
 parser.add_argument("-d", "--debug",action='store_true',
                     help="Will not delete submission files in the end. Useful for debugging and will only print the submission command on screen.")
 parser.add_argument("-n", "--n_files_per_run", type=int, default=1)
+parser.add_argument("-T", "--n_trials",type=int, default=1)
 parser.add_argument("-r", "--run_no", type=int, default=0)
 
 parser.add_argument("-t", "--track_energy_distortion", type=float, nargs="+")
@@ -82,6 +83,7 @@ if args.accept_np:
     truth_selection_args += " --accept_np"
 if args.accept_ntrk:
     truth_selection_args += " --accept_ntrk"
+truth_selection_args += " -t %i" % args.n_trials
 
 ofstr='''
 #!/bin/bash
