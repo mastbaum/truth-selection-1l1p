@@ -673,6 +673,14 @@ bool TSSelection::finalize() {
   header_tree->Branch("accept_np", &to_header->accept_np);
   header_tree->Branch("accept_ntrk", &to_header->accept_ntrk);
   header_tree->Branch("input_files", &to_header->input_files);
+ 
+  header_tree->Branch("good_1e1p", &good_1e1p);
+  header_tree->Branch("miss_1e1p", &miss_1e1p);
+  header_tree->Branch("true_1e1p", &true_1e1p);
+
+  header_tree->Branch("good_1m1p", &good_1m1p);
+  header_tree->Branch("miss_1m1p", &miss_1m1p);
+  header_tree->Branch("true_1m1p", &true_1m1p);
 
   header.track_producer = _track_producer;
   header.fw_producer = _fw_producer;
