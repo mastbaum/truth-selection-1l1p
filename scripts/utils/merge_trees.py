@@ -11,6 +11,14 @@ def loop_merge(source_dir, dir_name, temp_dir, min_selection, max_selection, app
     t_list_per_selection = [ROOT.TList() for i in range(nselections)]
     merge_count = 0
 
+    n_good_1e1p = [0 for i in range(nselections)]
+    n_true_1e1p = [0 for i in range(nselections)]
+    n_miss_1e1p = [0 for i in range(nselections)]
+
+    n_good_1m1p = [0 for i in range(nselections)]
+    n_true_1m1p = [0 for i in range(nselections)]
+    n_miss_1m1p = [0 for i in range(nselections)]
+
     while 1:
         if dir_name > max_dir_name:
             break
@@ -19,6 +27,10 @@ def loop_merge(source_dir, dir_name, temp_dir, min_selection, max_selection, app
             f = open_root(fname)
             file_list_per_selection[i].append(f)
             if f is None:
+                print "MISSING or CORRUPTED FILE %i in DIRECTORY %i" % (i + min_selection, dir_name)
+                continue
+            """
+            if f is None:
                 fname_2 = fname.replace("_try2","")
                 f2 = open_root(fname_2)
                 if f2 is None:
@@ -26,12 +38,22 @@ def loop_merge(source_dir, dir_name, temp_dir, min_selection, max_selection, app
                     continue
                 else:
                     file_list_per_selection[i][-1] = f2
+            """
+            for j, entry in enumerate(f.Get("header")):
+		n_good_1e1p[i] += entry.good_1e1p
+		n_true_1e1p[i] += entry.true_1e1p
+		n_miss_1e1p[i] += entry.miss_1e1p
+		
+		n_good_1m1p[i] += entry.good_1m1p
+		n_true_1m1p[i] += entry.true_1m1p
+		n_miss_1m1p[i] += entry.miss_1m1p
+                assert(j==0)
 
             data_tree_list_per_selection[i].append( file_list_per_selection[i][-1].Get("data") )
             t_list_per_selection[i].Add(data_tree_list_per_selection[i][-1])
 
         merge_count += 1
-        max_n_merge = 400 / nselections
+        max_n_merge = 100 / nselections
         if (dir_name + 1) % max((max_n_merge / 10),1) == 0:
             print "Processed %i files" % ((dir_name + 1) * nselections)
             print "AT DIRECTORY: %i" % dir_name
@@ -42,25 +64,35 @@ def loop_merge(source_dir, dir_name, temp_dir, min_selection, max_selection, app
     if append:
         print "LOAD PREVIOUS AND MERGE AND WRITE" 
         for i in range(nselections):
-            if file_list_per_selection[i][-1] is not None:
-		temp_file_a = temp_dir + "temp%i" % (i+min_selection) + final_name
-		last_file = ROOT.TFile(temp_file_a)
-		data_tree = last_file.Get("data")
-		t_list_per_selection[i].Add(data_tree)
+	    temp_file_a = temp_dir + "temp%i" % (i+min_selection) + final_name
+	    last_file = ROOT.TFile(temp_file_a)
+	    data_tree = last_file.Get("data")
+	    t_list_per_selection[i].Add(data_tree)
 		
-                header_file = file_list_per_selection[i][-1]
+            header_file = file_list_per_selection[i][-1]
 		
-		temp_file_b = temp_dir + "temp%iB" % (i+min_selection) + final_name
-		merge_and_write(t_list_per_selection[i], header_file, temp_file_b)
+            n_good_1e1p[i] += last_file.Get("good_1e1p").GetUniqueID()
+            n_true_1e1p[i] += last_file.Get("true_1e1p").GetUniqueID()
+            n_miss_1e1p[i] += last_file.Get("miss_1e1p").GetUniqueID()
+            n_good_1m1p[i] += last_file.Get("good_1m1p").GetUniqueID()
+            n_true_1m1p[i] += last_file.Get("true_1m1p").GetUniqueID()
+            n_miss_1e1p[i] += last_file.Get("miss_1m1p").GetUniqueID()
+      
+
+	    temp_file_b = temp_dir + "temp%iB" % (i+min_selection) + final_name
+	    merge_and_write(t_list_per_selection[i], header_file, temp_file_b, 
+                             n_good_1e1p[i], n_true_1e1p[i], n_miss_1e1p[i], 
+                             n_good_1m1p[i], n_true_1m1p[i], n_miss_1m1p[i])
 		
-		last_file.Close()
+            last_file.Close()
     else:
         print "MERGE AND WRITE"
         for i in range(nselections):
-            if file_list_per_selection[i][-1] is not None:
-                header_file = file_list_per_selection[i][-1]
-		temp_file_b = temp_dir + "temp%iB" % (i+min_selection) + final_name
-		merge_and_write(t_list_per_selection[i], header_file, temp_file_b)
+            header_file = file_list_per_selection[i][-1]
+	    temp_file_b = temp_dir + "temp%iB" % (i+min_selection) + final_name
+	    merge_and_write(t_list_per_selection[i], header_file, temp_file_b, 
+                             n_good_1e1p[i], n_true_1e1p[i], n_miss_1e1p[i], 
+                             n_good_1m1p[i], n_true_1m1p[i], n_miss_1m1p[i])
 
     print "CLOSING FILES"
     [[f.Close() for f in lst if f is not None] for lst in file_list_per_selection]
@@ -85,12 +117,33 @@ def open_root(fname):
         return None
     return f
 
-def merge_and_write(t_list, header_file, f_out_name):
+def merge_and_write(t_list, header_file, f_out_name, n_good_1e1p, n_true_1e1p, n_miss_1e1p, n_good_1m1p, n_true_1m1p, n_miss_1m1p):
     f_out = ROOT.TFile(f_out_name, "RECREATE")
     f_out.cd()
     merged = ROOT.TTree.MergeTrees(t_list)
     merged.SetName("data")
     header = header_file.Get("header")
+
+    good_1e1p = ROOT.TNamed("good_1e1p", "good_1e1p")
+    good_1e1p.SetUniqueID(n_good_1e1p)
+    true_1e1p = ROOT.TNamed("true_1e1p", "true_1e1p")
+    true_1e1p.SetUniqueID(n_true_1e1p)
+    miss_1e1p = ROOT.TNamed("miss_1e1p", "miss_1e1p")
+    miss_1e1p.SetUniqueID(n_miss_1e1p)
+
+    good_1m1p = ROOT.TNamed("good_1m1p", "good_1m1p")
+    good_1m1p.SetUniqueID(n_good_1m1p)
+    true_1m1p = ROOT.TNamed("true_1m1p", "true_1m1p")
+    true_1m1p.SetUniqueID(n_true_1m1p)
+    miss_1m1p = ROOT.TNamed("miss_1m1p", "miss_1m1p")
+    miss_1m1p.SetUniqueID(n_miss_1m1p)
+
+    good_1e1p.Write()
+    miss_1e1p.Write()
+    true_1e1p.Write()
+    good_1m1p.Write()
+    miss_1m1p.Write()
+    true_1m1p.Write()
 
     merged.Write()
     header.CloneTree().Write()
