@@ -8,36 +8,43 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import chi2
+import read_eff
 
-def main(background_dir, signal_dir, shower_dist, track_dist):
+def main(background_dir, signal_dir, shower_dist, track_dist, effs=None):
     selections = selections_list(track_dist, shower_dist) 
     significances = []
 
     for i in range(len(shower_dist) * len(track_dist)):
         background_name =  background_dir + "cov_bkg_%i" % i
-        signal_name = signal_dir + "cov_sig_%i" % i
+        signal_name = signal_dir + "cov_sig_makross_%i" % i
         enu_mx, enu_m, enu_ex, enu_e, enu_s, enu_ss, cov = \
             chi2.load(background_name + '/cov_all.root', signal_name + '/cov_all.root')
         eb = np.hstack((enu_m, enu_e))
         fcov = cov / np.einsum('i,j', eb, eb)
-        em = enu_m
+        em = enu_m 
         ee = enu_e
         es = enu_s
     
-        significances.append(
-               chi2.significance(em, ee, es, fcov,
-                   pot=66e19, syst=True, mc=False, eff_m=0.3, eff_e=0.3)
-        )
+        if effs is None:
+            significances.append(
+                   chi2.significance(em, ee, es, fcov,
+                       pot=66e19, syst=True, mc=False, eff_m=0.3, eff_e=0.3)
+            )
+        else:
+            significances.append(
+                   chi2.significance(em, ee, es, fcov,
+                       pot=66e19, syst=True, mc=False, eff_m=0.3, eff_e=0.3,
+                       truth_eff_e=effs[i][0], truth_eff_s=effs[i][1], truth_eff_m=effs[i][2])
+            )
+
 
     data = np.zeros(( len(track_dist) , len(shower_dist) ))
     for i,sig in enumerate(significances):
         t_ind = i / len(track_dist)
         s_ind = i % len(shower_dist)
         data[s_ind][t_ind] = sig
-        print "NEXT"
-        print t_ind, s_ind, sig
-        print i, selections[i], track_dist[t_ind], shower_dist[s_ind]
     
+    print data
     fig, ax = plt.subplots()
     
     heatmap = ax.pcolor(data) 
@@ -62,6 +69,7 @@ if __name__ == "__main__":
     track_dist = [0,0.01,0.02,0.03,0.04,0.05]
     background_dir = sys.argv[1]
     signal_dir = sys.argv[2]
+
     main(background_dir, signal_dir, shower_dist, track_dist)
 
 
