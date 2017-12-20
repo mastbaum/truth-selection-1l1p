@@ -17,6 +17,8 @@
 #include "TSCovariance.h"
 #include "TRandom.h"
 
+
+using namespace std;
 namespace galleryfmwk {
 
 std::vector<std::vector<TGraph*> > BinCorrelations(
@@ -219,6 +221,7 @@ void TSCovariance::init() {
   // use CCQE energy by default
   _use_ccqe = true;
 
+
   std::cout << "TSCovariance: Initialized. Weights: ";
   for (auto it : use_weights) {
     std::cout << it << " ";
@@ -251,7 +254,7 @@ void TSCovariance::analyze() {
   _tree->SetBranchAddress("ccnc", &_data.ccnc);
   _tree->SetBranchAddress("bnbweight", &_data.bnbweight);
   _tree->SetBranchAddress("weights", &_data.weights);
-  _tree->SetBranchAddress("eps", &_data.eps);
+  //_tree->SetBranchAddress("eps", &_data.eps);
   _tree->SetBranchAddress("elep", &_data.elep);
   _tree->SetBranchAddress("thetalep", &_data.thetalep);
 
@@ -370,6 +373,7 @@ void TSCovariance::analyze() {
       hg.SetBinContent(ibin, samples[i]->enu->GetBinContent(j));
       hg.SetBinError(ibin, samples[i]->enu->GetBinError(j));
       if (hgsys.size() != samples[i]->enu_syst.size()) {
+        ibin++;
         continue;
       }
       for (size_t k=0; k<hgsys.size(); k++) {
