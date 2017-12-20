@@ -45,7 +45,10 @@ if args.all_combinations:
    track_energy_distortion = list(itertools.chain.from_iterable(itertools.repeat(x, s_len) for x in track_energy_distortion))
    shower_energy_distortion *= t_len
 
-assert(len(track_energy_distortion) == len(shower_energy_distortion))
+if not track_energy_distortion is None:
+    assert(len(track_energy_distortion) == len(shower_energy_distortion))
+else:
+    assert(shower_energy_distortion is None)
 
 n_selections = 1 if track_energy_distortion is None else len(track_energy_distortion)
 
@@ -132,7 +135,7 @@ do
 done
 ifdh cp -f filelist
 
-echo "What's in here? "
+echo "What's in here? " >>${_RUN_NUMBER}.out 2>&1
 ls >>${_RUN_NUMBER}.out 2>&1
 
 echo " Run time! " >>${_RUN_NUMBER}.out 2>&1
