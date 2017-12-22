@@ -148,21 +148,32 @@ int TSSelection::get_nl(std::vector<PIDParticle>& p, int lpdg) {
   return nl;
 }
 
-bool TSSelection::pass_selection(std::vector<PIDParticle>& p, int lpdg) {
+bool TSSelection::pass_selection(std::vector<PIDParticle>& p, int lpdg, EventType t) {
   // Count protons and the chosen lepton type
   size_t np = (size_t)get_np(p);
   size_t nl = (size_t)get_nl(p, lpdg);
   size_t n_trk = (size_t)get_ntrk(p);
 
   bool pass_1l1p = nl == 1 && np == 1 && nl + np == p.size();
-  bool pass_1lnp = nl == 1 && np > 1 && nl + np == p.size();
+  bool pass_1lnp = nl == 1 && np >= 1 && nl + np == p.size();
   bool pass_1lntrk = nl == 1 && n_trk >= 1 && nl + n_trk == p.size();
   bool pass_1l0p = nl == 1 && np == 0 && nl + np == p.size();
 
-  return (pass_1l1p && _accept_1p) 
-      || (pass_1lnp && _accept_np) 
-      || (pass_1lntrk && _accept_ntrk)
-      || (pass_1l0p && _accept_0p);
+  bool ret;
+  switch(t) {
+  case ANY: 
+    ret = (pass_1l1p && _accept_1p) 
+       || (pass_1lnp && _accept_np) 
+       || (pass_1lntrk && _accept_ntrk)
+       || (pass_1l0p && _accept_0p);
+    break;
+
+  case P0: ret = (pass_1l0p && _accept_0p); break;
+  case PN: ret = (pass_1lnp && _accept_np); break;
+  case P1: ret = (pass_1l1p && _accept_1p); break;
+  case TRKN: ret = (pass_1lntrk && _accept_ntrk); break; 
+  }
+  return ret;
 }
 
 
@@ -199,14 +210,6 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
 
   // Initialize dataset identifier
   _dataset_id = -1;
-
-  // Initialize event counters
-  true_1e1p = 0;
-  good_1e1p = 0;
-  miss_1e1p = 0;
-  true_1m1p = 0;
-  good_1m1p = 0;
-  miss_1m1p = 0;
 
   // set producer to null
   _ew_producer = "";
@@ -272,6 +275,13 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
 
   _truthtree = new TNtuple("truth", "", "nupdg:enu:ccnc:int:mode:w:q2:lpdg:elep:tlep:npip:npim:npi0:np:nn:fw:ttrk:rtrk:texit:tshr:rshr:sexit");
   _mectree = new TNtuple("mec", "", "nupdg:enu:ccnc:mode:w:q2:lpdg:tlep:ep0:ep1:ep2:ep3:ep4");
+
+  _counts = std::map<EventType, EventCounts>();
+  _counts[P0] = EventCounts();
+  _counts[P1] = EventCounts();
+  _counts[PN] = EventCounts();
+  _counts[TRKN] = EventCounts();
+  _counts[ANY] = EventCounts();
 
   _record_truth = true;
   _record_mec = true;
@@ -465,16 +475,26 @@ bool TSSelection::analyze(gallery::Event* ev) {
         });
       }
 
-      // Classify the event (found/true 1lip/1m1p)
+      // get Event counts
+      EventType event_types[5] = {PN, P0, P1, TRKN, ANY};
+      for (auto t: event_types) {
+        bool f_1e = pass_selection(particles_found, 11, t); 
+        bool t_1e = pass_selection(particles_true, 11, t); 
+        bool f_1m = pass_selection(particles_found, 13, t); 
+        bool t_1m = pass_selection(particles_true, 13, t); 
+        _counts[t].fill(f_1e, t_1e, f_1m, t_1m);
+      }
+
+      // Classify the event (found/true 1l/1m)
       // "True" good_event here means there are one true l and one true p that pass the
       // track/shower cuts (i.e. are in within this specific signal definition).
-      bool f_1e1p = pass_selection(particles_found, 11);
-      bool t_1e1p = pass_selection(particles_true, 11);
-      bool f_1m1p = pass_selection(particles_found, 13);
-      bool t_1m1p = pass_selection(particles_true, 13);
+      bool f_1e = pass_selection(particles_found, 11);
+      bool t_1e = pass_selection(particles_true, 11);
+      bool f_1m = pass_selection(particles_found, 13);
+      bool t_1m = pass_selection(particles_true, 13);
 
       // Where have all the muons gone?
-      //if (t_1m1p && !f_1m1p) {
+      //if (t_1m && !f_1m) {
       //  std::cout << "1m1p missed" << std::endl;
       //  std::cout << "true: n=" << particles_true.size() << ": ";
       //  for (size_t i=0; i<particles_true.size(); i++) {
@@ -488,17 +508,9 @@ bool TSSelection::analyze(gallery::Event* ev) {
       //  }
       //  std::cout << std::endl;
       //}
-      
-      if (t_1e1p) true_1e1p++;
-      if (f_1e1p && t_1e1p) good_1e1p++;
-      if (f_1e1p && !t_1e1p) miss_1e1p++;
-      
-      if (t_1m1p) true_1m1p++;
-      if (f_1m1p && t_1m1p) good_1m1p++;
-      if (f_1m1p && !t_1m1p) miss_1m1p++;
-      
+     
       // Print out PID information mis-IDs
-      if ((f_1e1p && !t_1e1p) || (f_1m1p && !t_1m1p)) {
+      if ((f_1e && !t_1e) || (f_1m && !t_1m)) {
         std::cout << "true: " << mctruth.GetNeutrino().Nu().E() * 1000
                   << "[" << mctruth.GetNeutrino().InteractionType() << "] ";
         for (size_t k=0; k<particles_true.size(); k++) {
@@ -513,7 +525,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
         std::cout << std::endl;
       }
       // Write event to output tree for found 1l1p events
-      if (f_1e1p || f_1m1p) {
+      if (f_1e || f_1m) {
         double eccqe=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
 
         std::vector<double> eps;
@@ -643,29 +655,29 @@ bool TSSelection::analyze(gallery::Event* ev) {
 
 bool TSSelection::finalize() {
   // Print out statistics
-  std::cout << "1e1p true: " << true_1e1p
-            << ", good: " << good_1e1p
-            << ", miss: " << miss_1e1p
+  std::cout << "1e true: " << _counts[ANY].true_1e
+            << ", good: " << _counts[ANY].good_1e
+            << ", miss: " << _counts[ANY].miss_1e
             << std::endl;
 
-  std::cout << "1e1p eff: "
-            << 1.0 * (good_1e1p + miss_1e1p) / true_1e1p
+  std::cout << "1e eff: "
+            << 1.0 * (_counts[ANY].good_1e + _counts[ANY].miss_1e) / _counts[ANY].true_1e
             << std::endl;
 
-  std::cout << "1e1p pur: "
-            << 1.0 * good_1e1p / (good_1e1p + miss_1e1p)
+  std::cout << "1e pur: "
+            << 1.0 * _counts[ANY].good_1e / (_counts[ANY].good_1e + _counts[ANY].miss_1e)
             << std::endl;
 
-  std::cout << "1m1p true: " << true_1m1p
-            << ", good: " << good_1m1p
-            << ", miss: " << miss_1m1p << std::endl;
+  std::cout << "1m true: " << _counts[ANY].true_1m
+            << ", good: " << _counts[ANY].good_1m
+            << ", miss: " << _counts[ANY].miss_1m << std::endl;
 
-  std::cout << "1m1p eff: "
-            << 1.0 * (good_1m1p + miss_1m1p) / true_1m1p
+  std::cout << "1m eff: "
+            << 1.0 * (_counts[ANY].good_1m + _counts[ANY].miss_1m) / _counts[ANY].true_1m
             << std::endl;
 
-  std::cout << "1m1p pur: "
-            << 1.0 * good_1m1p / (good_1m1p + miss_1m1p)
+  std::cout << "1m pur: "
+            << 1.0 * _counts[ANY].good_1m / (_counts[ANY].good_1m + _counts[ANY].miss_1m)
             << std::endl;
 
   std::cout << "SHOWER, TRACK ENERGY RESOLUTION: " << _shower_energy_resolution << " "<< _track_energy_resolution << std::endl;
@@ -703,22 +715,6 @@ bool TSSelection::finalize() {
   header_tree->Branch("accept_ntrk", &to_header->accept_ntrk);
   header_tree->Branch("input_files", &to_header->input_files);
 
-  unsigned n_good_1e1p = static_cast<unsigned>(good_1e1p);
-  unsigned n_true_1e1p = static_cast<unsigned>(true_1e1p);
-  unsigned n_miss_1e1p = static_cast<unsigned>(miss_1e1p);
- 
-  unsigned n_good_1m1p = static_cast<unsigned>(good_1m1p);
-  unsigned n_true_1m1p = static_cast<unsigned>(true_1m1p);
-  unsigned n_miss_1m1p = static_cast<unsigned>(miss_1m1p);
-
-  header_tree->Branch("good_1e1p", &n_good_1e1p);
-  header_tree->Branch("miss_1e1p", &n_miss_1e1p);
-  header_tree->Branch("true_1e1p", &n_true_1e1p);
-
-  header_tree->Branch("good_1m1p", &n_good_1m1p);
-  header_tree->Branch("miss_1m1p", &n_miss_1m1p);
-  header_tree->Branch("true_1m1p", &n_true_1m1p);
-
   header.track_producer = _track_producer;
   header.fw_producer = _fw_producer;
   header.ew_producer = _ew_producer;
@@ -745,6 +741,8 @@ bool TSSelection::finalize() {
   header.accept_ntrk = _accept_ntrk;
 
   header.input_files = _input_files;
+
+  header.counts = std::map<EventType, EventCounts>(_counts);
 
   header_tree->Fill();
 

@@ -30,6 +30,28 @@ namespace galleryfmwk {
  * \brief Truth-based selection approximating 1l1p
  */
 class TSSelection {
+  enum EventType {
+    P0, P1, PN, TRKN, ANY
+  };
+
+  struct EventCounts {
+    size_t true_1e;
+    size_t good_1e;
+    size_t miss_1e;
+    size_t true_1m;
+    size_t good_1m;
+    size_t miss_1m;
+
+
+    inline void fill(bool f_1e, bool t_1e, bool f_1m, bool t_1m) {
+      if (t_1e) true_1e ++;
+      if (f_1e && t_1e) good_1e++;
+      if (f_1e && !t_1e) miss_1e++;
+      if (t_1m) true_1m++;
+      if (f_1m && t_1m) good_1m++;
+      if (f_1m && !t_1m) miss_1m++;
+    }
+  };
 
 public:
   // A structure to hold temporary track/shower data during processing
@@ -90,7 +112,9 @@ public:
   void setDatasetID(int id) { _dataset_id = id; }
 
   // Utility function to test if a list of particles is 1lip
-  bool pass_selection(std::vector<PIDParticle>& p, int lpdg); 
+  // If EventType is not set, will accept any event enabled by selection.
+  // Otherwise, will only accept events inside specified EventType.
+  bool pass_selection(std::vector<PIDParticle>& p, int lpdg, EventType t=ANY); 
 
   // Apply track cuts
   static inline bool goodTrack(const sim::MCTrack& t, const simb::MCTruth& truth, float energy_distortion=0., float angle_distortion=0.) {
@@ -150,6 +174,7 @@ public:
     std::map<std::string, std::vector<double> >* weights;
   };
 
+
   // structure to hold bokkeeping data
   struct HeaderData {
     // Data product producers
@@ -183,6 +208,8 @@ public:
     
     // input files
     std::vector<std::string> input_files;  
+    // event counts
+    std::map<EventType, EventCounts> counts;
   };
 
 protected:
@@ -196,12 +223,7 @@ protected:
   std::string _mcshw_producer;
 
   // Counters for efficiency and purity calculations
-  size_t true_1e1p;
-  size_t good_1e1p;
-  size_t miss_1e1p;
-  size_t true_1m1p;
-  size_t good_1m1p;
-  size_t miss_1m1p;
+  std::map<EventType, EventCounts> _counts;
 
   // Optionally set some energy resolution
   float _shower_energy_resolution;
