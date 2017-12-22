@@ -160,7 +160,7 @@ int main(int argv, char** argc) {
     selections[i].setVerbose(true);
     selections[i].setNTrials(n_trials);
     selections[i].setAcceptP(!drop_np, 2);
-    selections[i].setAcceptNTrk(!drop_ntrk);
+    selections[i].setAcceptNTrk(!drop_ntrack);
    
     if (dataset_id.size() > 0) {
         selections[i].setDatasetID( dataset_id[i] );
