@@ -31,8 +31,8 @@ parser.add_argument("-t", "--track_energy_distortion", type=float, nargs="+")
 parser.add_argument("-s", "--shower_energy_distortion", type=float, nargs="+")
 parser.add_argument("--track_energy_distortion_by_percent", action="store_true")
 parser.add_argument("--shower_energy_distortion_by_percent", action="store_true")
-parser.add_argument("--accept_np", action="store_true")
-parser.add_argument("--accept_ntrk", action="store_true")
+parser.add_argument("--drop_np", action="store_true")
+parser.add_argument("--drop_ntrk", action="store_true")
 parser.add_argument("--all_combinations", action="store_true")
 
 args = parser.parse_args()
@@ -82,10 +82,10 @@ if shower_energy_distortion is not None:
 truth_selection_args += " -d "
 for d in range(n_selections):
     truth_selection_args += "%i " % d
-if args.accept_np:
-    truth_selection_args += " --accept_np"
-if args.accept_ntrk:
-    truth_selection_args += " --accept_ntrk"
+if args.drop_np:
+    truth_selection_args += " --drop_np"
+if args.drop_ntrk:
+    truth_selection_args += " --drop_ntrk"
 truth_selection_args += " -t %i" % args.n_trials
 
 ofstr='''

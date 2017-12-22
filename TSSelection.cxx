@@ -230,9 +230,9 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
   _track_shower_confusion_distribution = std::bernoulli_distribution();
 
   _accept_1p = true;
-  _accept_ntrk = false;
-  _accept_np = false;
-  _accept_0p = false;
+  _accept_ntrk = true;
+  _accept_np = true;
+  _accept_0p = true;
 
   // setting up random # stuff
   std::random_device rd;
