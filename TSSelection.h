@@ -63,6 +63,7 @@ public:
     double eccqe;
     double len;
     bool exiting;
+    unsigned int id;
 
     // Output stream operator to print a PIDParticle
     friend std::ostream& operator<<(std::ostream& os, const PIDParticle& dt);
@@ -172,6 +173,7 @@ public:
     double bnbweight;
     int dataset;
     std::map<std::string, std::vector<double> >* weights;
+    unsigned event_number;
   };
 
 
@@ -256,10 +258,16 @@ protected:
   bool _accept_np;
   bool _accept_ntrk;
 
+  // keep track of event index/number
+  unsigned _event_number;
+
   bool _verbose;  //!< Print verbose output
   int _dataset_id;  //!< An arbitrary numeric ID
   OutputData* _data;  //!< Output data
   TTree* _tree;  //!< Output tree
+
+  OutputData* _truth_data;  //!< Output data of truth
+  TTree* _truth_data_tree;  //!< Output tree of truth
 
   TNtuple* _truthtree;
   TNtuple* _mectree;

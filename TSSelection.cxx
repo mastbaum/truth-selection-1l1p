@@ -272,6 +272,35 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
   _tree->Branch("bnbweight", &_data->bnbweight);
   _tree->Branch("dataset", &_data->dataset);
   _tree->Branch("weights", &_data->weights);
+  _tree->Branch("event_number", &_data->event_number);
+
+  _truth_data = new OutputData;
+  _truth_data_tree = new TTree("truth_data", "");
+  _truth_data_tree->Branch("np", &_truth_data->np);
+  _truth_data_tree->Branch("n_trk", &_truth_data->n_trk);
+  _truth_data_tree->Branch("nupdg", &_truth_data->nupdg);
+  _truth_data_tree->Branch("enu", &_truth_data->enu);
+  _truth_data_tree->Branch("q2", &_truth_data->q2);
+  _truth_data_tree->Branch("w", &_truth_data->w);
+  _truth_data_tree->Branch("q0", &_truth_data->q0);
+  _truth_data_tree->Branch("q3", &_truth_data->q3);
+  _truth_data_tree->Branch("int", &_truth_data->int_type);
+  _truth_data_tree->Branch("mode", &_truth_data->int_mode);
+  _truth_data_tree->Branch("ccnc", &_truth_data->ccnc);
+  _truth_data_tree->Branch("eccqe", &_truth_data->eccqe);
+  _truth_data_tree->Branch("eps", &_truth_data->eps);
+  _truth_data_tree->Branch("ppdgs", &_truth_data->ppdgs);
+  _truth_data_tree->Branch("elep", &_truth_data->elep);
+  _truth_data_tree->Branch("thetalep", &_truth_data->thetalep);
+  _truth_data_tree->Branch("philep", &_truth_data->philep);
+  _truth_data_tree->Branch("lpdg", &_truth_data->lpdg);
+  _truth_data_tree->Branch("lpid", &_truth_data->lpid);
+  _truth_data_tree->Branch("llen", &_truth_data->llen);
+  _truth_data_tree->Branch("lexit", &_truth_data->lexit);
+  _truth_data_tree->Branch("bnbweight", &_truth_data->bnbweight);
+  _truth_data_tree->Branch("dataset", &_truth_data->dataset);
+  _truth_data_tree->Branch("weights", &_truth_data->weights);
+  _truth_data_tree->Branch("event_number", &_truth_data->event_number);
 
   _truthtree = new TNtuple("truth", "", "nupdg:enu:ccnc:int:mode:w:q2:lpdg:elep:tlep:npip:npim:npi0:np:nn:fw:ttrk:rtrk:texit:tshr:rshr:sexit");
   _mectree = new TNtuple("mec", "", "nupdg:enu:ccnc:mode:w:q2:lpdg:tlep:ep0:ep1:ep2:ep3:ep4");
@@ -285,6 +314,8 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
 
   _record_truth = true;
   _record_mec = true;
+
+  _event_number = 0;
 
   return true;
 }
@@ -380,7 +411,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
           mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()),
           tsutil::eccqe(mct.Start().Momentum()),
           s,
-          !tsutil::inFV(mct)
+          !tsutil::inFV(mct),
+          mct.TrackID()
         });
 
 
@@ -423,7 +455,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
           mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()) + energy_distortion,
           tsutil::eccqe(mct.Start().Momentum(), energy_distortion, angle_distortion),
           s,
-          !tsutil::inFV(mct)
+          !tsutil::inFV(mct),
+          mct.TrackID()
         });
       } 
 
@@ -450,7 +483,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
           mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode()),
           tsutil::eccqe(mcs.Start().Momentum()),
           -1,
-          !tsutil::inFV(mcs)
+          !tsutil::inFV(mcs),
+          mcs.TrackID()
         });
 
         nshowers++;
@@ -471,7 +505,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
           mcs.Start().E() + energy_distortion - tsutil::get_pdg_mass(mcs.PdgCode()),
           tsutil::eccqe(mcs.Start().Momentum(), energy_distortion, angle_distortion),
           -1,
-          !tsutil::inFV(mcs)
+          !tsutil::inFV(mcs),
+          mcs.TrackID()
         });
       }
 
@@ -524,6 +559,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
         }
         std::cout << std::endl;
       }
+      unsigned int lep_id = 0;
       // Write event to output tree for found 1l1p events
       if (f_1e || f_1m) {
         double eccqe=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
@@ -536,6 +572,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
             ppdgs.push_back( particles_found[k].pdgtrue );
           }
           else {
+            lep_id = particles_found[k].id;
             eccqe = particles_found[k].eccqe;
             elep = particles_found[k].evis;
             thetalep = particles_found[k].p.Theta();
@@ -581,7 +618,69 @@ bool TSSelection::analyze(gallery::Event* ev) {
 	_data->bnbweight = wbnb;
 	_data->dataset = _dataset_id;
 	_data->weights = &wgh;
+        _data->event_number = _event_number;
 	_tree->Fill();
+      }
+      // block to contain filling truth data tree -- may include if statement later
+      {
+        double eccqe=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
+        std::vector<double> eps;
+        std::vector<int> ppdgs;
+        for (size_t k=0; k<particles_true.size(); k++) {
+          if (particles_true[k].pdg == 2212) {
+            eps.push_back( particles_true[k].evis );
+            ppdgs.push_back( particles_true[k].pdgtrue );
+          }
+          else {
+            if (lep_id == particles_true[k].id) {
+	      eccqe = particles_true[k].eccqe;
+	      elep = particles_true[k].evis;
+	      thetalep = particles_true[k].p.Theta();
+	      philep = particles_true[k].p.Phi();
+	      lpid = particles_true[k].pdg;
+	      lpdg = particles_true[k].pdgtrue;
+	      llen = particles_true[k].len;
+	      lexit = particles_true[k].exiting;
+            }
+          }
+        }
+
+        const simb::MCNeutrino& nu = mctruth.GetNeutrino();
+        const simb::MCParticle& pnu = nu.Nu();
+        const simb::MCParticle& plep = nu.Lepton();
+        TLorentzVector xp = (pnu.Momentum() - plep.Momentum());
+
+        std::map<std::string, std::vector<double> > wgh;
+        if (!eventweights_list.empty()) {
+          wgh = eventweights_list[0].fWeight;
+        }
+
+        _truth_data->np = get_np(particles_true);
+        _truth_data->n_trk = get_ntrk(particles_true);
+	_truth_data->nupdg = nu.Nu().PdgCode();
+	_truth_data->enu = nu.Nu().E();
+	_truth_data->q2 = nu.QSqr();
+	_truth_data->w = nu.W();
+	_truth_data->q0 = xp.E();
+	_truth_data->q3 = xp.Vect().Mag();
+	_truth_data->int_type = nu.InteractionType();
+	_truth_data->int_mode = nu.Mode();
+	_truth_data->ccnc = nu.CCNC();
+	_truth_data->eccqe = eccqe;
+	_truth_data->eps = eps;
+	_truth_data->ppdgs = ppdgs;
+	_truth_data->elep = elep;
+	_truth_data->thetalep = thetalep;
+	_truth_data->philep = philep;
+	_truth_data->lpdg = lpdg;
+	_truth_data->lpid = lpid;
+	_truth_data->llen = llen;
+	_truth_data->lexit = lexit;
+	_truth_data->bnbweight = wbnb;
+	_truth_data->dataset = _dataset_id;
+	_truth_data->weights = &wgh;
+        _truth_data->event_number = _event_number;
+	_truth_data_tree->Fill();
       }
 
 
