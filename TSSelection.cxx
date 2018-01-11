@@ -53,10 +53,6 @@ void TSSelection::setTrackAngleResolution(float res, bool by_percent) {
   _track_angle_distribution = std::normal_distribution<float>(0., res);
 }
 
-void TSSelection::setTrackShowerConfusion(float percent) {
-  _track_shower_confusion_distribution = std::bernoulli_distribution(percent);
-}
-
 void TSSelection::setAcceptP(bool b, int n_protons) {
   if (n_protons == 1)
     _accept_1p = b;
@@ -99,11 +95,14 @@ float TSSelection::nextTrackAngleDistortion(float this_angle=0.) {
   }
 }
 
-bool TSSelection::nextTrackShowerConfusion() {
-  if (_track_shower_confusion < 1e-4)
-    return false;
-  else 
-    return _track_shower_confusion_distribution(_gen);
+int TSSelection::nextParticleID(float energy, int true_pdgid) {
+  if (!_particle_misid.is_set()) {
+    return true_pdgid;
+  }
+  else {
+    return _particle_misid.get(energy)->particle_id(true_pdgid, _random(_gen));
+  }
+
 }
 
 float TSSelection::nextShowerAngleDistortion(float this_angle=0.) {
@@ -229,8 +228,8 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
   _shower_angle_distribution = std::normal_distribution<float>(0.0, 0.0);
   _track_angle_distribution = std::normal_distribution<float>(0.0, 0.0);
 
-  _track_shower_confusion = 0.;
-  _track_shower_confusion_distribution = std::bernoulli_distribution();
+  _random = std::uniform_real_distribution<float>(0., 1.);
+  _particle_misid = EnergyMap<PDGConfusionMatrix>();
 
   _accept_1p = true;
   _accept_ntrk = true;

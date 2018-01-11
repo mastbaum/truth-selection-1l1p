@@ -69,6 +69,90 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const PIDParticle& dt);
   };
 
+  struct PDGConfusionMatrix {
+    // map[true_pdg, fake_pdg] = the % chance to id a particle
+    // w/ 'true_pdg' as a the particle 'fake_pdg'
+    std::map<std::tuple<int, int>, float> _map;
+    std::set<int> _particle_pdgids;
+    PDGConfusionMatrix() : _map(), _particle_pdgids() {}
+
+    int particle_id(int true_pdgid, float chance) {
+      float accumulator = 0.;
+      for (int pdg: _particle_pdgids) {
+        accumulator += get(true_pdgid, pdg);
+        if (accumulator > chance) {
+          return pdg;
+        }
+      } 
+      assert(false);
+      return -1;
+    }
+
+    void add(int true_pdgid, int test_pdgid, float id_rate) {
+      _map[std::tuple<int, int>(true_pdgid, test_pdgid)] = id_rate;
+      _particle_pdgids.insert(true_pdgid);
+      _particle_pdgids.insert(test_pdgid);
+    }
+
+    float get(int true_pdgid, int test_pdgid) {
+      // assert that this particle has been considered
+      assert(_particle_pdgids.find(true_pdgid) != _particle_pdgids.end());
+      assert(_particle_pdgids.find(test_pdgid) != _particle_pdgids.end());
+      
+      auto key = std::tuple<int, int>(true_pdgid, test_pdgid);
+      if (_map.count(key) > 0) {
+        return _map[key];
+      }
+      else {
+        return 0.;
+      }
+    }
+
+    void set(std::map<std::tuple<int, int>, float> map, std::set<int> vec) {
+      _map = map;
+      _particle_pdgids = vec;
+    }
+
+    void check() {
+      for (int true_pdg: _particle_pdgids) {
+        float accumulator = 0.;
+        for (int test_pdg: _particle_pdgids) {
+          accumulator += get(true_pdg, test_pdg);
+        }
+        assert(abs(accumulator - 1.) < 1e-4);
+      } 
+
+    }
+  };
+
+  template<typename T> class EnergyMap {
+    public:
+    std::vector<std::tuple<float, T>> *_map;
+    EnergyMap() { _map = NULL; }
+
+    inline void set_energies(std::vector<float> energies) {
+      _map = new std::vector<std::tuple<float, T>>();
+      for (float energy: energies) {
+        _map->push_back(std::tuple<float, T>(energy, T()));
+      }
+    }
+
+    inline bool is_set() {
+      return _map != NULL;
+    }
+
+    T *get(float energy) {
+      assert(_map != NULL);
+      for (auto tup: *_map) {
+	float check_energy = std::get<0>(tup);
+        if (energy < check_energy) {
+          return &std::get<1>(tup);
+        } 
+      }
+      assert(false);
+    }
+  };
+
   TSSelection(): _verbose(false) {}
 
   bool initialize(std::vector<std::string> input_files);
@@ -101,8 +185,17 @@ public:
   float nextShowerAngleDistortion(float);
   float nextTrackAngleDistortion(float);
 
-  void setTrackShowerConfusion(float);
-  bool nextTrackShowerConfusion();
+  int nextParticleID(float energy, int true_pdgid);
+  void addParticleIDRate(int true_pdgid, int test_pdgid, float rate, float energy)
+      { _particle_misid.get(energy)->add(true_pdgid, test_pdgid, rate); }
+  void setParticleIDEnergyRange(std::vector<float> range) 
+      { _particle_misid.set_energies(range); }
+  void checkParticleIDRates() {
+    for (auto tup: *_particle_misid._map) {
+      std::get<1>(tup).check();
+    } 
+  }
+  
 
   void setAcceptP(bool, int);
   void setAcceptNTrk(bool b) { _accept_ntrk = b; }
@@ -214,6 +307,7 @@ public:
     std::map<EventType, EventCounts> counts;
   };
 
+
 protected:
   // Data product producers
   std::string _track_producer;
@@ -242,9 +336,14 @@ protected:
   bool _track_angle_by_percent;
   std::normal_distribution<float> _track_angle_distribution;
 
+  // source of randomness for confusion stuff
+  std::uniform_real_distribution<float> _random;
+
   // track-shower confusion
-  float _track_shower_confusion;
-  std::bernoulli_distribution _track_shower_confusion_distribution;
+  //EnergyMap<float> _track_shower_confusion;
+
+  // particle mis-id's
+  EnergyMap<PDGConfusionMatrix> _particle_misid;
 
   // random stuff
   std::mt19937 _gen;
