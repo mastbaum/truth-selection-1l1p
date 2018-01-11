@@ -6,13 +6,14 @@
 #define GALLERY_FMWK_TSCONFIG_H
 
 #include <assert.h>
+#include <list>
 
 namespace tsconfig {
 
   struct ConfigInfo {
     public:
-    std::vector<float> energy_range;
-    std::vector<std::vector<std::tuple<int, int, float>>> confusion_entries;
+    std::list<float> energy_range;
+    std::list<std::list<std::tuple<int, int, float>>> confusion_entries;
 
     void save(const char *fname) {
       TFile file(fname, "RECREATE");
@@ -22,6 +23,20 @@ namespace tsconfig {
       TBranch *confusion_entries = config->Branch("confusion_entries", &confusion_entries);
       config->Fill();
       config->Write();
+    }
+
+    std::vector<std::vector<std::tuple<int, int, float>>> confusionEntries() {
+      std::vector<std::vector<std::tuple<int, int, float>>> ret;
+      for (auto const &list: confusion_entries) {
+         std::vector<std::tuple<int, int, float>> data{ std::begin(list), std::end(list) };
+         ret.push_back(data);
+      }
+      return ret;
+    }
+
+    std::vector<float> energyRange() {
+      std::vector<float> ret{ std::begin(energy_range), std::end(energy_range) };
+      return ret;
     }
 
     static ConfigInfo *load(const char *fname) {
