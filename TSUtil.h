@@ -49,6 +49,7 @@ double eccqe(const TLorentzVector& v, float energy_distortion=0., float angle_di
 // Get the mass for a particle or ion
 double get_pdg_mass(const int pdg);
 
+bool is_shower_pdgid(int pdg);
 
 // Build a distribution of track dE/dx vs. residual range
 TH2F* HistDEdx(const sim::MCTrack& t, const std::string name="htemp",
