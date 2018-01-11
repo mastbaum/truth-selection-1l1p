@@ -1,5 +1,3 @@
-#include <experimental/optional>
-
 #include <TDatabasePDG.h>
 #include <TFile.h>
 #include <TKey.h>
@@ -9,6 +7,7 @@
 #include <TTree.h>
 
 #include "TSUtil.h"
+#include "TSConfig.h"
 #include "TSSelection.h"
 
 using namespace std;
@@ -55,6 +54,7 @@ int main(int argv, char** argc) {
 
   bool drop_np = false;
   bool drop_ntrack = false;
+  char *root_config_file_name = NULL;
 
   cout << "Processing Runtime arguments" << endl;
 
@@ -138,8 +138,18 @@ int main(int argv, char** argc) {
       cout << "Drop Ntrck" << endl;
       continue;
     }
+    if (strcmp(argc[i], "--root_config_file") == 0) {
+      i++;
+      root_config_file_name = argc[i];
+      continue;
+    }
     filename.push_back(string(argc[i]));
     cout << "Input file: " << argc[i] << endl;
+  }
+
+  tsconfig::ConfigInfo *config = NULL;
+  if (root_config_file_name != NULL) {
+    config = tsconfig::ConfigInfo::load(root_config_file_name);
   }
 
   std::vector<galleryfmwk::TSSelection> selections(n_selections);
@@ -161,6 +171,21 @@ int main(int argv, char** argc) {
     selections[i].setNTrials(n_trials);
     selections[i].setAcceptP(!drop_np, 2);
     selections[i].setAcceptNTrk(!drop_ntrack);
+
+    if (config != NULL) {
+      assert(config->energy_range.size() == config->confusion_entries.size());
+      selections[i].setParticleIDEnergyRange(config->energy_range);
+      for (unsigned j = 0; j < config->energy_range.size(); j++) {
+        for (auto confusion_entry: config->confusion_entries[j]) {
+          int true_pdgid;
+          int test_pdgid;
+          float id_rate;
+          std::tie (true_pdgid, test_pdgid, id_rate) = confusion_entry;
+          selections[i].addParticleIDRate(true_pdgid, test_pdgid, id_rate, config->energy_range[j]);
+          cout << "At ENERGY: " << config->energy_range[j] << " TRUE ID " << true_pdgid << " TEST ID " << test_pdgid << " RATE " << id_rate << endl;
+        }
+      }
+    }
    
     if (dataset_id.size() > 0) {
         selections[i].setDatasetID( dataset_id[i] );
