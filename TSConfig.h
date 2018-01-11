@@ -15,7 +15,7 @@ namespace tsconfig {
     std::vector<float> energy_range;
     std::vector<std::vector<int>> confusion_true_pdg;
     std::vector<std::vector<int>> confusion_test_pdg;
-    std::vector<std::vector<float>> confusion_id_rate;
+    std::vector<std::vector<double>> confusion_id_rate;
 
     void save(const char *fname) {
       TFile *file = new TFile(fname, "RECREATE");
@@ -32,19 +32,19 @@ namespace tsconfig {
 
     ConfigInfo() : energy_range(), confusion_true_pdg(), confusion_test_pdg(), confusion_id_rate() {}
 
-    ConfigInfo(std::list<std::list<std::tuple<int, int, float>>> confusion_input, std::list<float> energies_input) { 
+    ConfigInfo(std::list<std::list<std::tuple<int, int, double>>> confusion_input, std::list<float> energies_input) { 
       std::vector<std::vector<int>> true_pdg_vec;
       std::vector<std::vector<int>> test_pdg_vec; 
-      std::vector<std::vector<float>> id_rate_vec;
+      std::vector<std::vector<double>> id_rate_vec;
 
       for (auto const &vector: confusion_input) {
         std::vector<int> confusion_true_pdg;
         std::vector<int> confusion_test_pdg;
-        std::vector<float> confusion_rate_id;
+        std::vector<double> confusion_rate_id;
         for (auto const &tuple: vector) {
           int pdg_true;
           int pdg_test;
-          float id_rate;
+          double id_rate;
           std::tie(pdg_true, pdg_test, id_rate) = tuple;
           confusion_true_pdg.push_back(pdg_true);
           confusion_test_pdg.push_back(pdg_test);
@@ -60,11 +60,6 @@ namespace tsconfig {
       confusion_true_pdg = true_pdg_vec;
       confusion_test_pdg = test_pdg_vec;
       confusion_id_rate = id_rate_vec;
-    }
-
-    std::vector<float> energyRange() {
-      std::vector<float> ret{ std::begin(energy_range), std::end(energy_range) };
-      return ret;
     }
 
     static ConfigInfo *load(const char *fname) {

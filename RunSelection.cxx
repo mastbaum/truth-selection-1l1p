@@ -182,8 +182,8 @@ int main(int argv, char** argc) {
         for (unsigned k = 0; k < config->confusion_true_pdg[j].size(); k++) {
           int true_pdgid = config->confusion_true_pdg[j][k];
           int test_pdgid = config->confusion_test_pdg[j][k];
-          float id_rate = config->confusion_id_rate[j][k];
-          selections[i].addParticleIDRate(true_pdgid, test_pdgid, id_rate, config->energy_range[j]);
+          float id_rate = (float) config->confusion_id_rate[j][k];
+          selections[i].addParticleIDRate(true_pdgid, test_pdgid, id_rate, (float) config->energy_range[j]);
           cout << "At ENERGY: " << config->energy_range[j] << " TRUE ID " << true_pdgid << " TEST ID " << test_pdgid << " RATE " << id_rate << endl;
         }
       }
