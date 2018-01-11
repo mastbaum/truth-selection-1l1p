@@ -175,18 +175,16 @@ int main(int argv, char** argc) {
     selections[i].setAcceptNTrk(!drop_ntrack);
 
     if (config != NULL) {
-      std::vector<float> energy_range = config->energyRange();
-      auto confusion_entries = config->confusionEntries();
-      assert(energy_range.size() == confusion_entries.size());
-      selections[i].setParticleIDEnergyRange(energy_range);
-      for (unsigned j = 0; j < energy_range.size(); j++) {
-        for (auto confusion_entry: confusion_entries[j]) {
-          int true_pdgid;
-          int test_pdgid;
-          float id_rate;
-          std::tie (true_pdgid, test_pdgid, id_rate) = confusion_entry;
-          selections[i].addParticleIDRate(true_pdgid, test_pdgid, id_rate, energy_range[j]);
-          cout << "At ENERGY: " << energy_range[j] << " TRUE ID " << true_pdgid << " TEST ID " << test_pdgid << " RATE " << id_rate << endl;
+      assert(config->energy_range.size() == config->confusion_true_pdg.size());
+
+      selections[i].setParticleIDEnergyRange(config->energy_range);
+      for (unsigned j = 0; j < config->energy_range.size(); j++) {
+        for (unsigned k = 0; k < config->confusion_true_pdg[j].size(); k++) {
+          int true_pdgid = config->confusion_true_pdg[j][k];
+          int test_pdgid = config->confusion_test_pdg[j][k];
+          float id_rate = config->confusion_id_rate[j][k];
+          selections[i].addParticleIDRate(true_pdgid, test_pdgid, id_rate, config->energy_range[j]);
+          cout << "At ENERGY: " << config->energy_range[j] << " TRUE ID " << true_pdgid << " TEST ID " << test_pdgid << " RATE " << id_rate << endl;
         }
       }
     }
