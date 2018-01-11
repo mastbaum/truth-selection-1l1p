@@ -177,33 +177,6 @@ bool TSSelection::pass_selection(std::vector<PIDParticle>& p, int lpdg, EventTyp
 
 
 bool TSSelection::initialize(std::vector<std::string> input_files) {
-  // Load track dE/dx distributions from file
-  _pdf_file = TFile::Open("./dedx_pdfs.root");
-  assert(_pdf_file->IsOpen());
-
-  TIter next(_pdf_file->GetListOfKeys());
-  TKey* key;
-  while ((key = (TKey*)next())) {
-    const char* name = key->GetName();
-    TObjArray* tokens = TString(name).Tokenize("_");
-    TString htype = ((TObjString*)tokens->At(0))->GetString();
-    int pdg = atoi(((TObjString*)tokens->At(1))->GetString());
-
-    if (htype.Contains("htrackdedx")) {
-      TH2F* h = (TH2F*) _pdf_file->Get(name);
-      if (h->Integral() == 0 || pdg < 0 || pdg > 10000) { continue; }
-
-      // Ignore a few low bins
-      for (int i=0; i<h->GetNbinsX(); i++) {
-        for (int j=0; j<h->GetNbinsY(); j++) {
-          if (i < 2 || j < 2) {
-            h->SetBinContent(i, j, 0);
-          }
-        }
-      }
-      _trackdedxs[pdg] = h;
-    }
-  }
   // initialize input files
   _input_files = input_files;
 

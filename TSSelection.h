@@ -379,9 +379,6 @@ protected:
   // whether to record truth level data
   bool _record_truth;
   bool _record_mec;
-
-  TFile* _pdf_file;  //!< File containing dE/dx PDFs
-  std::map<int, TH2F*> _trackdedxs;  // Track dE/dx distributions
 };
 
 }  // namespace galleryfmwk
