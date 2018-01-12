@@ -30,6 +30,7 @@ namespace galleryfmwk {
  * \brief Truth-based selection approximating 1l1p
  */
 class TSSelection {
+public:
   enum EventType {
     P0, P1, PN, TRKN, ANY
   };
@@ -53,7 +54,6 @@ class TSSelection {
     }
   };
 
-public:
   // A structure to hold temporary track/shower data during processing
   struct PIDParticle {
     int pdg;
