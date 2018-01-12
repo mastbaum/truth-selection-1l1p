@@ -8,6 +8,9 @@
 #include <assert.h>
 #include <list>
 
+#include <TFile.h>
+#include <TTree.h>
+
 namespace tsconfig {
 
   struct ConfigInfo {

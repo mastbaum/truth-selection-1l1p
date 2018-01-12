@@ -159,6 +159,7 @@ public:
         } 
       }
       assert(false);
+      return NULL;
     }
   };
 
