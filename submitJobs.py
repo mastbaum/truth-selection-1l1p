@@ -27,6 +27,7 @@ parser.add_argument("-n", "--n_files_per_run", type=int, default=1)
 parser.add_argument("-T", "--n_trials",type=int, default=1)
 parser.add_argument("-r", "--run_no", type=int, default=0)
 
+parser.add_argument("-c", "--root_config_file", default=None)
 parser.add_argument("-t", "--track_energy_distortion", type=float, nargs="+")
 parser.add_argument("-s", "--shower_energy_distortion", type=float, nargs="+")
 parser.add_argument("--track_energy_distortion_by_percent", action="store_true")
@@ -79,6 +80,9 @@ if shower_energy_distortion is not None:
         truth_selection_args += "%f " % dist
     if args.shower_energy_distortion_by_percent:
         truth_selection_args += " --S_edist_by_percent"
+if args.root_config_file is not None:
+    truth_selection_args += " --root_config_file %s" % args.root_config_file
+
 truth_selection_args += " -d "
 for d in range(n_selections):
     truth_selection_args += "%i " % d
