@@ -74,7 +74,10 @@ public:
     // w/ 'true_pdg' as a the particle 'fake_pdg'
     std::map<std::tuple<int, int>, float> _map;
     std::set<int> _particle_pdgids;
-    PDGConfusionMatrix() : _map(), _particle_pdgids() {}
+    PDGConfusionMatrix() { 
+      _particle_pdgids = std::set<int>();
+      _map = std::map<std::tuple<int, int>, float>();
+    }
 
     int particle_id(int true_pdgid, float chance) {
       float accumulator = 0.;
@@ -89,9 +92,10 @@ public:
     }
 
     void add(int true_pdgid, int test_pdgid, float id_rate) {
-      _map[std::tuple<int, int>(true_pdgid, test_pdgid)] = id_rate;
       _particle_pdgids.insert(true_pdgid);
       _particle_pdgids.insert(test_pdgid);
+      auto key = std::tuple<int, int>(true_pdgid, test_pdgid);
+      _map.insert(std::map<std::tuple<int, int>, float>::value_type(key, id_rate));
     }
 
     float get(int true_pdgid, int test_pdgid) {
@@ -127,26 +131,31 @@ public:
 
   template<typename T> class EnergyMap {
     public:
-    std::vector<std::tuple<float, T>> *_map;
-    EnergyMap() { _map = NULL; }
+    std::vector<float> *_energies;
+    std::vector<T> *_objs;
+    EnergyMap() {}
 
-    inline void set_energies(std::vector<float> energies) {
-      _map = new std::vector<std::tuple<float, T>>();
-      for (float energy: energies) {
-        _map->push_back(std::tuple<float, T>(energy, T()));
+    inline void set_energies(std::vector<float> *energies) {
+      _energies = energies;
+      _objs = new std::vector<T>();
+      for (float energy: *_energies) {
+       (void) energy;
+        T type;
+        _objs->push_back(type);
       }
     }
 
     inline bool is_set() {
-      return _map != NULL;
+      return _energies != NULL;
     }
 
     T *get(float energy) {
-      assert(_map != NULL);
-      for (auto tup: *_map) {
-	float check_energy = std::get<0>(tup);
+      assert(_energies!= NULL);
+      assert(_objs != NULL);
+      for (unsigned i = 0; i < _energies->size(); i++) {
+        float check_energy = (*_energies)[i];
         if (energy < check_energy) {
-          return &std::get<1>(tup);
+          return &(*_objs)[i];
         } 
       }
       assert(false);
@@ -189,10 +198,10 @@ public:
   void addParticleIDRate(int true_pdgid, int test_pdgid, float rate, float energy)
       { _particle_misid.get(energy)->add(true_pdgid, test_pdgid, rate); }
   void setParticleIDEnergyRange(std::vector<float> range) 
-      { _particle_misid.set_energies(range); }
+      { _particle_misid.set_energies(new std::vector<float>(range)); }
   void checkParticleIDRates() {
-    for (auto tup: *_particle_misid._map) {
-      std::get<1>(tup).check();
+    for (unsigned i = 0; i < _particle_misid._objs->size(); i++) {
+      (*_particle_misid._objs)[i].check();
     } 
   }
   

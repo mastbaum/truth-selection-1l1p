@@ -183,7 +183,7 @@ int main(int argv, char** argc) {
           int true_pdgid = config->confusion_true_pdg[j][k];
           int test_pdgid = config->confusion_test_pdg[j][k];
           float id_rate = (float) config->confusion_id_rate[j][k];
-          selections[i].addParticleIDRate(true_pdgid, test_pdgid, id_rate, (float) config->energy_range[j]);
+          selections[i].addParticleIDRate(true_pdgid, test_pdgid, id_rate, (float) config->energy_range[j] - 1.);
           cout << "At ENERGY: " << config->energy_range[j] << " TRUE ID " << true_pdgid << " TEST ID " << test_pdgid << " RATE " << id_rate << endl;
         }
       }
@@ -202,6 +202,7 @@ int main(int argv, char** argc) {
 
 
 
+  /*
   cout << "Analyze" << endl;
   for (gallery::Event ev(filename) ; !ev.atEnd(); ev.next()) { 
     for (galleryfmwk::TSSelection &selection: selections) {
@@ -213,5 +214,6 @@ int main(int argv, char** argc) {
   for (galleryfmwk::TSSelection &selection: selections) {
     selection.finalize();
   }
+  */
 }
 

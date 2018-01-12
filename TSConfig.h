@@ -65,13 +65,20 @@ namespace tsconfig {
     static ConfigInfo *load(const char *fname) {
       TFile file(fname);
       file.cd();
-      TTree* tree = (TTree*) file.Get("config");
+      TTree* tree = (TTree*) file.Get("data");
       assert(tree && tree->GetEntries() > 0);
+
       ConfigInfo *ret = new ConfigInfo;
-      tree->SetBranchAddress("energy_range", &ret->energy_range);
-      tree->SetBranchAddress("confusion_true_pdg", &ret->confusion_true_pdg);
-      tree->SetBranchAddress("confusion_test_pdg", &ret->confusion_test_pdg);
-      tree->SetBranchAddress("confusion_rate_id", &ret->confusion_id_rate);
+
+      auto energy_range_ref = &ret->energy_range;
+      auto true_pdg_ref = &ret->confusion_true_pdg;
+      auto test_pdg_ref = &ret->confusion_test_pdg;
+      auto id_rate_ref = &ret->confusion_id_rate;
+
+      tree->SetBranchAddress("energy_range", &energy_range_ref);
+      tree->SetBranchAddress("confusion_true_pdg", &true_pdg_ref);
+      tree->SetBranchAddress("confusion_test_pdg", &test_pdg_ref);
+      tree->SetBranchAddress("confusion_id_rate", &id_rate_ref);
 
       tree->GetEntry(0);
       assert(ret->energy_range.size() > 0);
