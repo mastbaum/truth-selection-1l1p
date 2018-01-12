@@ -18,6 +18,14 @@ namespace tsconfig {
     std::vector<std::vector<double>> confusion_id_rate;
 
     void save(const char *fname) {
+      for (auto const &vector: confusion_id_rate) {
+        double accumulator = 0.;
+        for (double p: vector) {
+          accumulator += p;
+        }
+        assert(abs(std::fmod(accumulator, 1.)) < 1e-4);
+      }
+
       TFile *file = new TFile(fname, "RECREATE");
       file->cd();
       TTree *config = new TTree("data", "");
@@ -83,6 +91,13 @@ namespace tsconfig {
       tree->GetEntry(0);
       assert(ret->energy_range.size() > 0);
       assert(ret->confusion_true_pdg.size() > 0);
+      for (auto const &vector: ret->confusion_id_rate) {
+        double accumulator = 0.;
+        for (double p: vector) {
+          accumulator += p;
+        }
+        assert(abs(std::fmod(accumulator, 1.)) < 1e-4);
+      }
       return ret;
     } 
   };

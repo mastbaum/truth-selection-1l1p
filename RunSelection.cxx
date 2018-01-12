@@ -187,6 +187,7 @@ int main(int argv, char** argc) {
           cout << "At ENERGY: " << config->energy_range[j] << " TRUE ID " << true_pdgid << " TEST ID " << test_pdgid << " RATE " << id_rate << endl;
         }
       }
+      selections[i].checkParticleIDRates();
     }
    
     if (dataset_id.size() > 0) {
