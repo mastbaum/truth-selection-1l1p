@@ -201,9 +201,6 @@ int main(int argv, char** argc) {
     }
   }
 
-
-
-  /*
   cout << "Analyze" << endl;
   for (gallery::Event ev(filename) ; !ev.atEnd(); ev.next()) { 
     for (galleryfmwk::TSSelection &selection: selections) {
@@ -215,6 +212,5 @@ int main(int argv, char** argc) {
   for (galleryfmwk::TSSelection &selection: selections) {
     selection.finalize();
   }
-  */
 }
 
