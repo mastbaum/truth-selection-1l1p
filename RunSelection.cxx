@@ -44,6 +44,7 @@ int main(int argv, char** argc) {
 
   // All of the options
   int n_selections = 1;
+  int n_trials = 1;
   std::vector<int> dataset_id = {};
 
   std::vector<float> track_energy_distortion = {};
@@ -52,8 +53,8 @@ int main(int argv, char** argc) {
   std::vector<float> shower_energy_distortion = {};  
   bool shower_energy_distortion_by_percent = false;
 
-  bool accept_np = false;
-  bool accept_ntrack = false;
+  bool drop_np = false;
+  bool drop_ntrack = false;
 
   cout << "Processing Runtime arguments" << endl;
 
@@ -62,11 +63,10 @@ int main(int argv, char** argc) {
   vector<string> filename;
   for (int i = 1; i < argv; ++i) {
     if (strcmp(argc[i], "-o") == 0 || strcmp(argc[i], "--output_file") == 0) {
-      i ++;
-      while (i < argv && argc[i][0] != '-') {
+      while (i+1 < argv && argc[i+1][0] != '-') {
+        i ++;
         f_outs.push_back( new TFile(argc[i], "RECREATE") );
         cout << "Output File " << f_outs.size() << ": " << argc[i] << endl;
-        i ++;
       }
       continue;
     }
@@ -74,6 +74,12 @@ int main(int argv, char** argc) {
       i ++;
       n_selections = stoi(argc[i]);
       cout << "N Selections: " << n_selections << endl;
+      continue;
+    }
+    if (strcmp(argc[i], "-t") == 0 || strcmp(argc[i], "--Ntrials") == 0) {
+      i ++;
+      n_trials = stoi(argc[i]);
+      cout << "N Trials: " << n_trials << endl;
       continue;
     }
     if (strcmp(argc[i], "-d") == 0 || strcmp(argc[i], "--datasetId") == 0) {
@@ -122,14 +128,14 @@ int main(int argv, char** argc) {
       cout << "Shower Energy Distortion By Percent"  << endl;
       continue;
     }
-    if (strcmp(argc[i], "--accept_np") == 0) {
-      accept_np = true;
-      cout << "Accept Np" << endl;
+    if (strcmp(argc[i], "--drop_np") == 0) {
+      drop_np = true;
+      cout << "Drop Np" << endl;
       continue;
     }
-    if (strcmp(argc[i], "--accept_ntrk") == 0) {
-      accept_ntrack = true;
-      cout << "Accept Ntrck" << endl;
+    if (strcmp(argc[i], "--drop_ntrk") == 0) {
+      drop_ntrack = true;
+      cout << "Drop Ntrck" << endl;
       continue;
     }
     filename.push_back(string(argc[i]));
@@ -152,7 +158,9 @@ int main(int argv, char** argc) {
     selections[i].setMCTrackProducer("mcreco");
     selections[i].setMCShowerProducer("mcreco");
     selections[i].setVerbose(true);
-    
+    selections[i].setNTrials(n_trials);
+    selections[i].setAcceptP(!drop_np, 2);
+    selections[i].setAcceptNTrk(!drop_ntrack);
    
     if (dataset_id.size() > 0) {
         selections[i].setDatasetID( dataset_id[i] );

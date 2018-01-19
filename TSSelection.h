@@ -30,6 +30,28 @@ namespace galleryfmwk {
  * \brief Truth-based selection approximating 1l1p
  */
 class TSSelection {
+  enum EventType {
+    P0, P1, PN, TRKN, ANY
+  };
+
+  struct EventCounts {
+    size_t true_1e;
+    size_t good_1e;
+    size_t miss_1e;
+    size_t true_1m;
+    size_t good_1m;
+    size_t miss_1m;
+
+
+    inline void fill(bool f_1e, bool t_1e, bool f_1m, bool t_1m) {
+      if (t_1e) true_1e ++;
+      if (f_1e && t_1e) good_1e++;
+      if (f_1e && !t_1e) miss_1e++;
+      if (t_1m) true_1m++;
+      if (f_1m && t_1m) good_1m++;
+      if (f_1m && !t_1m) miss_1m++;
+    }
+  };
 
 public:
   // A structure to hold temporary track/shower data during processing
@@ -41,6 +63,7 @@ public:
     double eccqe;
     double len;
     bool exiting;
+    unsigned int id;
 
     // Output stream operator to print a PIDParticle
     friend std::ostream& operator<<(std::ostream& os, const PIDParticle& dt);
@@ -84,11 +107,15 @@ public:
   void setAcceptP(bool, int);
   void setAcceptNTrk(bool b) { _accept_ntrk = b; }
 
+  void setNTrials(int n) { _n_trials = n; }
+
   // Set a numeric dataset ID, which is written into the tree as a tag
   void setDatasetID(int id) { _dataset_id = id; }
 
   // Utility function to test if a list of particles is 1lip
-  bool pass_selection(std::vector<PIDParticle>& p, int lpdg); 
+  // If EventType is not set, will accept any event enabled by selection.
+  // Otherwise, will only accept events inside specified EventType.
+  bool pass_selection(std::vector<PIDParticle>& p, int lpdg, EventType t=ANY); 
 
   // Apply track cuts
   static inline bool goodTrack(const sim::MCTrack& t, const simb::MCTruth& truth, float energy_distortion=0., float angle_distortion=0.) {
@@ -98,6 +125,10 @@ public:
             t.Start().E() - tsutil::get_pdg_mass(t.PdgCode()) + energy_distortion >= 60);
   }
 
+  static inline bool goodTrack(bool isEmpty, bool isFromNuVertex, bool isPrimaryProcess, float energy) {
+    return !isEmpty && isFromNuVertex && isPrimaryProcess && energy >= 60.;
+  }
+
   // Apply shower cuts
   static inline bool goodShower(const sim::MCShower& s, const simb::MCTruth& truth, float energy_distortion=0., float angle_distortion=0.) {
     return (tsutil::isFromNuVertex(truth, s) &&
@@ -105,11 +136,21 @@ public:
             (s.Start().E() - tsutil::get_pdg_mass(s.PdgCode())) + energy_distortion >= 30);
   }
 
+  static inline bool goodShower(bool isFromNuVertex, bool isPrimaryProcess, float energy) {
+    return isFromNuVertex && isPrimaryProcess && energy >= 30;
+  }
+
+  int get_nl(std::vector<PIDParticle>& p, int lpdg);
+  int get_ntrk(std::vector<PIDParticle>& p);
+  int get_np(std::vector<PIDParticle>& p);
+
   // A structure used to hold TTree output
   struct OutputData {
     OutputData() {
       weights = NULL;
     }
+    int np;
+    int n_trk;
     int nupdg;
     double enu;
     double q2;
@@ -132,7 +173,9 @@ public:
     double bnbweight;
     int dataset;
     std::map<std::string, std::vector<double> >* weights;
+    unsigned event_number;
   };
+
 
   // structure to hold bokkeeping data
   struct HeaderData {
@@ -156,14 +199,19 @@ public:
     float track_angle_resolution;
     bool track_angle_by_percent;
     
-    
+    // numbers of things
+    int n_trials;
+ 
     // turn on/off different types of selections
+    bool accept_0p;
     bool accept_1p;
     bool accept_np;
     bool accept_ntrk;
     
     // input files
     std::vector<std::string> input_files;  
+    // event counts
+    std::map<EventType, EventCounts> counts;
   };
 
 protected:
@@ -177,12 +225,7 @@ protected:
   std::string _mcshw_producer;
 
   // Counters for efficiency and purity calculations
-  size_t true_1e1p;
-  size_t good_1e1p;
-  size_t miss_1e1p;
-  size_t true_1m1p;
-  size_t good_1m1p;
-  size_t miss_1m1p;
+  std::map<EventType, EventCounts> _counts;
 
   // Optionally set some energy resolution
   float _shower_energy_resolution;
@@ -206,15 +249,25 @@ protected:
   // random stuff
   std::mt19937 _gen;
 
+  // number of times random stuff happens per event
+  int _n_trials;
+
   // turn on/off different types of selections
   bool _accept_1p;
+  bool _accept_0p;
   bool _accept_np;
   bool _accept_ntrk;
+
+  // keep track of event index/number
+  unsigned _event_number;
 
   bool _verbose;  //!< Print verbose output
   int _dataset_id;  //!< An arbitrary numeric ID
   OutputData* _data;  //!< Output data
   TTree* _tree;  //!< Output tree
+
+  OutputData* _truth_data;  //!< Output data of truth
+  TTree* _truth_data_tree;  //!< Output tree of truth
 
   TNtuple* _truthtree;
   TNtuple* _mectree;

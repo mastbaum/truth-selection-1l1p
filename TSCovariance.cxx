@@ -17,6 +17,8 @@
 #include "TSCovariance.h"
 #include "TRandom.h"
 
+
+using namespace std;
 namespace galleryfmwk {
 
 std::vector<std::vector<TGraph*> > BinCorrelations(
@@ -169,6 +171,39 @@ TSCovariance::TSCovariance() : fScaleFactorE(1.0), fScaleFactorMu(1.0),
                                fSeed(0) {}
 
 
+void TSCovariance::SetEEfficiencyBins(std::vector<float> bins) {
+   _energy_efficiency_bins = bins;
+}
+void TSCovariance::SetAEfficiencyBins(std::vector<float> bins) {
+   _angle_efficiency_bins = bins;
+}
+void TSCovariance::SetEfficiencies(std::vector<float> eff) {
+  assert((_energy_efficiency_bins.size() - 1) * (_angle_efficiency_bins.size() - 1) == _efficiencies.size());
+  _efficiencies = eff;
+}
+
+float TSCovariance::GetEffWeight(float energy, float angle) {
+  if (_energy_efficiency_bins.size() == 0) {
+    return 1.;
+  }
+
+  size_t i;
+  for (i = 0; i < _energy_efficiency_bins.size()-1 ; i ++) { 
+    if (energy > _energy_efficiency_bins[i] && energy < _energy_efficiency_bins[i]) {
+        break;
+    }
+  } 
+  assert(i != _energy_efficiency_bins.size()-1 );
+  size_t j;
+  for (j = 0; j < _angle_efficiency_bins.size()-1 ; j ++) { 
+    if (angle > _angle_efficiency_bins[i] && angle < _angle_efficiency_bins[i]) {
+        break;
+    }
+  } 
+  assert(j != _angle_efficiency_bins.size()-1);
+  return _efficiencies[j * (_angle_efficiency_bins.size() -1) + i];
+}
+
 void TSCovariance::AddWeight(std::string w) {
   use_weights.insert(w);
 }
@@ -186,6 +221,7 @@ void TSCovariance::init() {
   // use CCQE energy by default
   _use_ccqe = true;
 
+
   std::cout << "TSCovariance: Initialized. Weights: ";
   for (auto it : use_weights) {
     std::cout << it << " ";
@@ -193,6 +229,9 @@ void TSCovariance::init() {
   std::cout << std::endl;
 
   std::cout << "TSCovariance: Writing output to " << fOutputFile << std::endl;
+  _efficiencies = std::vector<float>();
+  _energy_efficiency_bins = std::vector<float>();
+  _angle_efficiency_bins = std::vector<float>();
 
   gRandom->SetSeed(fSeed);
 }
@@ -215,6 +254,9 @@ void TSCovariance::analyze() {
   _tree->SetBranchAddress("ccnc", &_data.ccnc);
   _tree->SetBranchAddress("bnbweight", &_data.bnbweight);
   _tree->SetBranchAddress("weights", &_data.weights);
+  //_tree->SetBranchAddress("eps", &_data.eps);
+  _tree->SetBranchAddress("elep", &_data.elep);
+  _tree->SetBranchAddress("thetalep", &_data.thetalep);
 
   // Event loop
   for (long k=0; k<_tree->GetEntries(); k++) {
@@ -272,6 +314,8 @@ void TSCovariance::analyze() {
     }
 
     fs *= _data.bnbweight;  // Apply BNB correction weight
+    // apply efficiency weight (binned for now by energy and angle)
+    fs *= GetEffWeight(nuEnergy, _data.thetalep); 
 
     // Fill histograms for this event sample
     if (sample->enu_syst.empty()) {
@@ -329,6 +373,7 @@ void TSCovariance::analyze() {
       hg.SetBinContent(ibin, samples[i]->enu->GetBinContent(j));
       hg.SetBinError(ibin, samples[i]->enu->GetBinError(j));
       if (hgsys.size() != samples[i]->enu_syst.size()) {
+        ibin++;
         continue;
       }
       for (size_t k=0; k<hgsys.size(); k++) {

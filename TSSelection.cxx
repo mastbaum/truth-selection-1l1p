@@ -62,6 +62,8 @@ void TSSelection::setAcceptP(bool b, int n_protons) {
     _accept_1p = b;
   else if (n_protons > 1)
     _accept_np = b;
+  else if (n_protons == 0)
+    _accept_0p = b;
 }
 
 float TSSelection::nextTrackEnergyDistortion(float this_energy=0.) {
@@ -115,33 +117,63 @@ float TSSelection::nextShowerAngleDistortion(float this_angle=0.) {
   }
 }
 
-bool TSSelection::pass_selection(std::vector<PIDParticle>& p, int lpdg) {
-  // Count protons and the chosen lepton type
-  size_t np = 0;
-  size_t nl = 0;
-  size_t n_trk = 0;
+int TSSelection::get_np(std::vector<PIDParticle>& p) {
+  int np = 0;
   for (size_t i=0; i<p.size(); i++) {
     if (p[i].pdg == 2212) {
       np++;
-      n_trk ++;
     }
+  }
+  return np;
+}
+
+int TSSelection::get_ntrk(std::vector<PIDParticle>& p) {
+  int n_trk = 0;
+  for (size_t i=0; i<p.size(); i++) {
     // test for charged pions (the only other possible track?)
-    if (abs(p[i].pdg) == 211) {
+    if (p[i].pdg == 2212 || p[i].pdg == 211) {
       n_trk++;
     }
+  }
+  return n_trk;
+}
+
+int TSSelection::get_nl(std::vector<PIDParticle>& p, int lpdg) { 
+  int nl = 0;
+  for (size_t i=0; i<p.size(); i++) {
     if (p[i].pdg == lpdg) {
       nl++;
     }
   }
+  return nl;
+}
 
+bool TSSelection::pass_selection(std::vector<PIDParticle>& p, int lpdg, EventType t) {
+  // Count protons and the chosen lepton type
+  size_t np = (size_t)get_np(p);
+  size_t nl = (size_t)get_nl(p, lpdg);
+  size_t n_trk = (size_t)get_ntrk(p);
 
   bool pass_1l1p = nl == 1 && np == 1 && nl + np == p.size();
-  bool pass_1lnp = nl == 1 && nl + np == p.size();
-  bool pass_1lntrk = nl == 1 && nl + n_trk == p.size();
+  bool pass_1lnp = nl == 1 && np >= 1 && nl + np == p.size();
+  bool pass_1lntrk = nl == 1 && n_trk >= 1 && nl + n_trk == p.size();
+  bool pass_1l0p = nl == 1 && np == 0 && nl + np == p.size();
 
-  return (pass_1l1p && _accept_1p) 
-      || (pass_1lnp && _accept_np) 
-      || (pass_1lntrk && _accept_ntrk);
+  bool ret;
+  switch(t) {
+  case ANY: 
+    ret = (pass_1l1p && _accept_1p) 
+       || (pass_1lnp && _accept_np) 
+       || (pass_1lntrk && _accept_ntrk)
+       || (pass_1l0p && _accept_0p);
+    break;
+
+  case P0: ret = (pass_1l0p && _accept_0p); break;
+  case PN: ret = (pass_1lnp && _accept_np); break;
+  case P1: ret = (pass_1l1p && _accept_1p); break;
+  case TRKN: ret = (pass_1lntrk && _accept_ntrk); break; 
+  }
+  return ret;
 }
 
 
@@ -179,14 +211,6 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
   // Initialize dataset identifier
   _dataset_id = -1;
 
-  // Initialize event counters
-  true_1e1p = 0;
-  good_1e1p = 0;
-  miss_1e1p = 0;
-  true_1m1p = 0;
-  good_1m1p = 0;
-  miss_1m1p = 0;
-
   // set producer to null
   _ew_producer = "";
 
@@ -209,8 +233,9 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
   _track_shower_confusion_distribution = std::bernoulli_distribution();
 
   _accept_1p = true;
-  _accept_ntrk = false;
-  _accept_np = false;
+  _accept_ntrk = true;
+  _accept_np = true;
+  _accept_0p = true;
 
   // setting up random # stuff
   std::random_device rd;
@@ -223,6 +248,8 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
 
   _data = new OutputData;
   _tree = new TTree("data", "");
+  _tree->Branch("np", &_data->np);
+  _tree->Branch("n_trk", &_data->n_trk);
   _tree->Branch("nupdg", &_data->nupdg);
   _tree->Branch("enu", &_data->enu);
   _tree->Branch("q2", &_data->q2);
@@ -245,12 +272,50 @@ bool TSSelection::initialize(std::vector<std::string> input_files) {
   _tree->Branch("bnbweight", &_data->bnbweight);
   _tree->Branch("dataset", &_data->dataset);
   _tree->Branch("weights", &_data->weights);
+  _tree->Branch("event_number", &_data->event_number);
+
+  _truth_data = new OutputData;
+  _truth_data_tree = new TTree("truth_data", "");
+  _truth_data_tree->Branch("np", &_truth_data->np);
+  _truth_data_tree->Branch("n_trk", &_truth_data->n_trk);
+  _truth_data_tree->Branch("nupdg", &_truth_data->nupdg);
+  _truth_data_tree->Branch("enu", &_truth_data->enu);
+  _truth_data_tree->Branch("q2", &_truth_data->q2);
+  _truth_data_tree->Branch("w", &_truth_data->w);
+  _truth_data_tree->Branch("q0", &_truth_data->q0);
+  _truth_data_tree->Branch("q3", &_truth_data->q3);
+  _truth_data_tree->Branch("int", &_truth_data->int_type);
+  _truth_data_tree->Branch("mode", &_truth_data->int_mode);
+  _truth_data_tree->Branch("ccnc", &_truth_data->ccnc);
+  _truth_data_tree->Branch("eccqe", &_truth_data->eccqe);
+  _truth_data_tree->Branch("eps", &_truth_data->eps);
+  _truth_data_tree->Branch("ppdgs", &_truth_data->ppdgs);
+  _truth_data_tree->Branch("elep", &_truth_data->elep);
+  _truth_data_tree->Branch("thetalep", &_truth_data->thetalep);
+  _truth_data_tree->Branch("philep", &_truth_data->philep);
+  _truth_data_tree->Branch("lpdg", &_truth_data->lpdg);
+  _truth_data_tree->Branch("lpid", &_truth_data->lpid);
+  _truth_data_tree->Branch("llen", &_truth_data->llen);
+  _truth_data_tree->Branch("lexit", &_truth_data->lexit);
+  _truth_data_tree->Branch("bnbweight", &_truth_data->bnbweight);
+  _truth_data_tree->Branch("dataset", &_truth_data->dataset);
+  _truth_data_tree->Branch("weights", &_truth_data->weights);
+  _truth_data_tree->Branch("event_number", &_truth_data->event_number);
 
   _truthtree = new TNtuple("truth", "", "nupdg:enu:ccnc:int:mode:w:q2:lpdg:elep:tlep:npip:npim:npi0:np:nn:fw:ttrk:rtrk:texit:tshr:rshr:sexit");
   _mectree = new TNtuple("mec", "", "nupdg:enu:ccnc:mode:w:q2:lpdg:tlep:ep0:ep1:ep2:ep3:ep4");
 
+  _counts = std::map<EventType, EventCounts>();
+  _counts[P0] = EventCounts();
+  _counts[P1] = EventCounts();
+  _counts[PN] = EventCounts();
+  _counts[TRKN] = EventCounts();
+  _counts[ANY] = EventCounts();
+
   _record_truth = true;
   _record_mec = true;
+
+  _event_number = 0;
 
   return true;
 }
@@ -305,297 +370,381 @@ bool TSSelection::analyze(gallery::Event* ev) {
     const simb::MCTruth& mctruth = mctruth_list.at(i);
     const simb::GTruth& gtruth = gtruth_list.at(i);
 
-    size_t ntracks = 0, nshowers = 0;
+    for (int trial_ind = 0; trial_ind < _n_trials; trial_ind ++) {
+      size_t ntracks = 0, nshowers = 0;
 
-    // Keep track of event particle content (currently a little redundant)
-    std::vector<PIDParticle> particles_found;
-    std::vector<PIDParticle> particles_true;
+      // Keep track of event particle content (currently a little redundant)
+      std::vector<PIDParticle> particles_found;
+      std::vector<PIDParticle> particles_true;
 
-    // Get vertex-associated contained tracks
-    for (size_t j=0; j<mctrack_list.size(); j++) {
-      const sim::MCTrack& mct = mctrack_list.at(j);
+      // Get vertex-associated contained tracks
+      for (size_t j=0; j<mctrack_list.size(); j++) {
+        const sim::MCTrack& mct = mctrack_list.at(j);
       
-      float this_angle = mct.Start().Momentum().Theta();
-      float this_energy = mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode());
-      float energy_distortion = nextTrackEnergyDistortion( this_energy );
-      float angle_distortion = nextTrackAngleDistortion(this_angle);
+        float this_angle = mct.Start().Momentum().Theta();
+        float this_energy = mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode());
+        float energy_distortion = nextTrackEnergyDistortion( this_energy );
+        float angle_distortion = nextTrackAngleDistortion(this_angle);
 
-      // Apply track cuts
-      if (!goodTrack(mct, mctruth, energy_distortion, angle_distortion)) {
-        continue;
-      }
+        bool isEmpty = mct.empty();
+        bool isFromNuVertex = tsutil::isFromNuVertex(mctruth, mct);
+        bool isPrimaryProces = mct.Process() == "primary";
 
-      // Track length
-      double s = 0;
-      TLorentzVector pos = mct.End().Position();
-      for (long k=mct.size()-2; k>=0; k--) {
-        s += (pos.Vect() - mct[k].Position().Vect()).Mag();
-        pos = mct[k].Position();
-      }
-
-      // don't apply energy distortion to the "true" particle data
-      particles_true.push_back({
-        mct.PdgCode(),
-        mct.PdgCode(),
-        mct.Start().Momentum(),
-        mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()),
-        tsutil::eccqe(mct.Start().Momentum()),
-        s,
-        !tsutil::inFV(mct)
-      });
-
-      ntracks++;
-
-      // KS test on dE/dx vs. range to pick the best match for PID
-      TH2F* htemp = tsutil::HistDEdx(mct);
-      double ks_best = 0;
-      int pdg_best = -999;
-
-      for (auto const& it : _trackdedxs) {
-        if (htemp->Integral() == 0 || it.second->Integral() == 0) { continue; }
-
-        double ks = it.second->KolmogorovTest(htemp);
-        if (ks > ks_best) {
-          ks_best = ks;
-          pdg_best = it.first;
+        // Apply track cuts for truth information
+        if (!goodTrack(mct, mctruth, energy_distortion, angle_distortion)) {
+          continue;
         }
-      }
 
-      delete htemp;
-
-      // Un-PID "protons" that are too long or short
-      if (pdg_best == 2212 && (s > 80 || s < 12)) {
-        pdg_best = -888;
-      }
-
-      // Call all remaining unmatched tracks protons
-      if (pdg_best == -999) {
-        pdg_best = 2212;
-      }
-
-      auto new_momentum = TLorentzVector(mct.Start().Momentum());
-      new_momentum.SetTheta(this_angle + angle_distortion);
-      particles_found.push_back({
-        pdg_best,
-        mct.PdgCode(),
-        new_momentum,
-        mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()) + energy_distortion,
-        tsutil::eccqe(mct.Start().Momentum(), energy_distortion, angle_distortion),
-        s,
-        !tsutil::inFV(mct)
-      });
-    }
-
-
-    // Get vertex-associated contained showers
-    for (size_t j=0; j<mcshower_list.size(); j++) {
-      const sim::MCShower& mcs = mcshower_list.at(j);
-
-      float this_energy = mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode());
-      float energy_distortion = nextShowerEnergyDistortion( this_energy );
-
-      // Apply shower cuts
-      if (!goodShower(mcs, mctruth, energy_distortion)) {
-        continue;
-      }
-
-      // don't apply energy distortion to the "true" particle data
-      particles_true.push_back({
-        mcs.PdgCode(),
-        mcs.PdgCode(),
-        mcs.Start().Momentum(),
-        mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode()),
-        tsutil::eccqe(mcs.Start().Momentum()),
-        -1,
-        !tsutil::inFV(mcs)
-      });
-
-      nshowers++;
-
-      // Guess the PDG based on shower dE/dx (cut at 3.5)
-      int pdg_best = (mcs.dEdx() < 3.5 ? 11 : 22);
-
-      particles_found.push_back({
-        pdg_best,
-        mcs.PdgCode(),
-        mcs.Start().Momentum(),
-        // @ANDY: IS THIS A BUG???
-        // previous lines have this energy as:
-        // mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode())
-        // note: fixed
-        mcs.Start().E() + energy_distortion - tsutil::get_pdg_mass(mcs.PdgCode()),
-        tsutil::eccqe(mcs.Start().Momentum(), energy_distortion),
-        -1,
-        !tsutil::inFV(mcs)
-      });
-    }
-
-    // Classify the event (found/true 1lip/1m1p)
-    // "True" good_event here means there are one true l and one true p that pass the
-    // track/shower cuts (i.e. are in within this specific signal definition).
-    bool f_1e1p = pass_selection(particles_found, 11);
-    bool t_1e1p = pass_selection(particles_true, 11);
-    bool f_1m1p = pass_selection(particles_found, 13);
-    bool t_1m1p = pass_selection(particles_true, 13);
-
-    // Where have all the muons gone?
-    //if (t_1m1p && !f_1m1p) {
-    //  std::cout << "1m1p missed" << std::endl;
-    //  std::cout << "true: n=" << particles_true.size() << ": ";
-    //  for (size_t i=0; i<particles_true.size(); i++) {
-    //    std::cout << particles_true[i].pdg << "/" << particles_true[i].pdgtrue << "(" << particles_true[i].evis << ") ";
-    //  }
-    //  std::cout << std::endl;
-
-    //  std::cout << "found: n=" << particles_found.size() << ": ";
-    //  for (size_t i=0; i<particles_found.size(); i++) {
-    //    std::cout << particles_found[i].pdg << "/" << particles_found[i].pdgtrue << "(" << particles_found[i].evis << ") ";
-    //  }
-    //  std::cout << std::endl;
-    //}
-
-    if (t_1e1p) true_1e1p++;
-    if (f_1e1p && t_1e1p) good_1e1p++;
-    if (f_1e1p && !t_1e1p) miss_1e1p++;
-
-    if (t_1m1p) true_1m1p++;
-    if (f_1m1p && t_1m1p) good_1m1p++;
-    if (f_1m1p && !t_1m1p) miss_1m1p++;
-
-    // Print out PID information mis-IDs
-    if ((f_1e1p && !t_1e1p) || (f_1m1p && !t_1m1p)) {
-      std::cout << "true: " << mctruth.GetNeutrino().Nu().E() * 1000
-                << "[" << mctruth.GetNeutrino().InteractionType() << "] ";
-      for (size_t k=0; k<particles_true.size(); k++) {
-        std::cout << particles_true[k] << " ";
-      }
-      std::cout << std::endl;
-      std::cout << "est: " << ntracks << " tracks, "
-                           << nshowers << " showers; ";
-      for (size_t k=0; k<particles_found.size(); k++) {
-        std::cout << particles_found[k] << " ";
-      }
-      std::cout << std::endl;
-    }
-    // Write event to output tree for found 1l1p events
-    if (f_1e1p || f_1m1p) {
-      double eccqe=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
-
-      std::vector<double> eps;
-      std::vector<int> ppdgs;
-      for (size_t k=0; k<particles_found.size(); k++) {
-        if (particles_found[k].pdg == 2212) {
-          eps.push_back( particles_found[k].evis );
-          ppdgs.push_back( particles_found[k].pdgtrue );
+        // Track length
+        double s = 0;
+        TLorentzVector pos = mct.End().Position();
+        for (long k=mct.size()-2; k>=0; k--) {
+          s += (pos.Vect() - mct[k].Position().Vect()).Mag();
+          pos = mct[k].Position();
         }
-        else {
-          eccqe = particles_found[k].eccqe;
-          elep = particles_found[k].evis;
-          thetalep = particles_found[k].p.Theta();
-          philep = particles_found[k].p.Phi();
-          lpid = particles_found[k].pdg;
-          lpdg = particles_found[k].pdgtrue;
-          llen = particles_found[k].len;
-          lexit = particles_found[k].exiting;
-        }
-      }
 
-      const simb::MCNeutrino& nu = mctruth.GetNeutrino();
-      const simb::MCParticle& pnu = nu.Nu();
-      const simb::MCParticle& plep = nu.Lepton();
-      TLorentzVector xp = (pnu.Momentum() - plep.Momentum());
-
-      std::map<std::string, std::vector<double> > wgh;
-      if (!eventweights_list.empty()) {
-        wgh = eventweights_list[0].fWeight;
-      }
-
-      _data->nupdg = nu.Nu().PdgCode();
-      _data->enu = nu.Nu().E();
-      _data->q2 = nu.QSqr();
-      _data->w = nu.W();
-      _data->q0 = xp.E();
-      _data->q3 = xp.Vect().Mag();
-      _data->int_type = nu.InteractionType();
-      _data->int_mode = nu.Mode();
-      _data->ccnc = nu.CCNC();
-      _data->eccqe = eccqe;
-      _data->eps = eps;
-      _data->ppdgs = ppdgs;
-      _data->elep = elep;
-      _data->thetalep = thetalep;
-      _data->philep = philep;
-      _data->lpdg = lpdg;
-      _data->lpid = lpid;
-      _data->llen = llen;
-      _data->lexit = lexit;
-      _data->bnbweight = wbnb;
-      _data->dataset = _dataset_id;
-      _data->weights = &wgh;
-      _tree->Fill();
-    }
+        // don't apply energy distortion to the "true" particle data
+        particles_true.push_back({
+          mct.PdgCode(),
+          mct.PdgCode(),
+          mct.Start().Momentum(),
+          mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()),
+          tsutil::eccqe(mct.Start().Momentum()),
+          s,
+          !tsutil::inFV(mct),
+          mct.TrackID()
+        });
 
 
-    // Fill the event truth tree
-    if (_record_truth) {
-      float vtt[22] = {
-	(float) mctruth.GetNeutrino().Nu().PdgCode(),
-	(float) mctruth.GetNeutrino().Nu().E(),
-	(float) mctruth.GetNeutrino().CCNC(),
-	(float) mctruth.GetNeutrino().InteractionType(),
-	(float) mctruth.GetNeutrino().Mode(),
-	(float) mctruth.GetNeutrino().W(),
-	(float) mctruth.GetNeutrino().QSqr(),
-	(float) mctruth.GetNeutrino().Lepton().PdgCode(),
-	(float) mctruth.GetNeutrino().Lepton().E(),
-	(float) gtruth.fGint,
-	(float) gtruth.fNumPiPlus,
-	(float) gtruth.fNumPiMinus,
-	(float) gtruth.fNumPi0,
-	(float) gtruth.fNumProton,
-	(float) gtruth.fNumNeutron,
-	(float) wbnb,
-	(float) mctrack_list.size(),
-	(float) ntracks,
-	(float) 0,
-	(float) mcshower_list.size(),
-	(float) nshowers,
-	(float) 0
-      };
-      _truthtree->Fill(vtt);
-    }
+        // now test whether 
+        ntracks++;
 
+        // KS test on dE/dx vs. range to pick the best match for PID
+        TH2F* htemp = tsutil::HistDEdx(mct);
+        double ks_best = 0;
+        int pdg_best = -999;
 
-    if (_record_mec) {
-      // Fill tree for MEC events with sorted proton energies
-      if (mctruth.GetNeutrino().Mode() == simb::kMEC) {
-        std::vector<float> epmec(5, -1);
-        for (size_t k=0; k<mctrack_list.size(); k++) {
-          const sim::MCTrack& t = mctrack_list[k];
-          if (t.PdgCode() == 2212 && t.Process() == "primary") {
-            double ke = t.Start().E() - tsutil::get_pdg_mass(t.PdgCode());
-            epmec.push_back(ke);
+        for (auto const& it : _trackdedxs) {
+          if (htemp->Integral() == 0 || it.second->Integral() == 0) { continue; }
+
+          double ks = it.second->KolmogorovTest(htemp);
+          if (ks > ks_best) {
+            ks_best = ks;
+            pdg_best = it.first;
           }
         }
 
-        std::sort(epmec.begin(), epmec.end(), std::greater<>());
+        delete htemp;
 
-        float v2[13] = {
+        // Un-PID "protons" that are too long or short
+        if (pdg_best == 2212 && (s > 80 || s < 12)) {
+          pdg_best = -888;
+        }
+
+        // Call all remaining unmatched tracks protons
+        if (pdg_best == -999) {
+          pdg_best = 2212;
+        }
+
+        auto new_momentum = TLorentzVector(mct.Start().Momentum());
+        new_momentum.SetTheta(this_angle + angle_distortion);
+        particles_found.push_back({
+          pdg_best,
+          mct.PdgCode(),
+          new_momentum,
+          mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode()) + energy_distortion,
+          tsutil::eccqe(mct.Start().Momentum(), energy_distortion, angle_distortion),
+          s,
+          !tsutil::inFV(mct),
+          mct.TrackID()
+        });
+      } 
+
+
+      // Get vertex-associated contained showers
+      for (size_t j=0; j<mcshower_list.size(); j++) {
+        const sim::MCShower& mcs = mcshower_list.at(j);
+
+        float this_energy = mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode());
+        float energy_distortion = nextShowerEnergyDistortion( this_energy );
+        float this_angle = mcs.Start().Momentum().Theta();
+        float angle_distortion = nextShowerAngleDistortion(this_angle);
+
+        // Apply shower cuts
+        if (!goodShower(mcs, mctruth, energy_distortion)) {
+          continue;
+        }
+
+        // don't apply energy distortion to the "true" particle data
+        particles_true.push_back({
+          mcs.PdgCode(),
+          mcs.PdgCode(),
+          mcs.Start().Momentum(),
+          mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode()),
+          tsutil::eccqe(mcs.Start().Momentum()),
+          -1,
+          !tsutil::inFV(mcs),
+          mcs.TrackID()
+        });
+
+        nshowers++;
+
+        // Guess the PDG based on shower dE/dx (cut at 3.5)
+        int pdg_best = (mcs.dEdx() < 3.5 ? 11 : 22);
+
+        TLorentzVector new_momentum(mcs.Start().Momentum());
+        new_momentum.SetTheta(this_angle + angle_distortion);
+        particles_found.push_back({
+          pdg_best,
+          mcs.PdgCode(),
+          new_momentum,
+          // @ANDY: IS THIS A BUG???
+          // previous lines have this energy as:
+          // mcs.Start().E() - tsutil::get_pdg_mass(mcs.PdgCode())
+          // note: fixed
+          mcs.Start().E() + energy_distortion - tsutil::get_pdg_mass(mcs.PdgCode()),
+          tsutil::eccqe(mcs.Start().Momentum(), energy_distortion, angle_distortion),
+          -1,
+          !tsutil::inFV(mcs),
+          mcs.TrackID()
+        });
+      }
+
+      // get Event counts
+      EventType event_types[5] = {PN, P0, P1, TRKN, ANY};
+      for (auto t: event_types) {
+        bool f_1e = pass_selection(particles_found, 11, t); 
+        bool t_1e = pass_selection(particles_true, 11, t); 
+        bool f_1m = pass_selection(particles_found, 13, t); 
+        bool t_1m = pass_selection(particles_true, 13, t); 
+        _counts[t].fill(f_1e, t_1e, f_1m, t_1m);
+      }
+
+      // Classify the event (found/true 1l/1m)
+      // "True" good_event here means there are one true l and one true p that pass the
+      // track/shower cuts (i.e. are in within this specific signal definition).
+      bool f_1e = pass_selection(particles_found, 11);
+      bool t_1e = pass_selection(particles_true, 11);
+      bool f_1m = pass_selection(particles_found, 13);
+      bool t_1m = pass_selection(particles_true, 13);
+
+      // Where have all the muons gone?
+      //if (t_1m && !f_1m) {
+      //  std::cout << "1m1p missed" << std::endl;
+      //  std::cout << "true: n=" << particles_true.size() << ": ";
+      //  for (size_t i=0; i<particles_true.size(); i++) {
+      //    std::cout << particles_true[i].pdg << "/" << particles_true[i].pdgtrue << "(" << particles_true[i].evis << ") ";
+      //  }
+      //  std::cout << std::endl;
+      
+      //  std::cout << "found: n=" << particles_found.size() << ": ";
+      //  for (size_t i=0; i<particles_found.size(); i++) {
+      //    std::cout << particles_found[i].pdg << "/" << particles_found[i].pdgtrue << "(" << particles_found[i].evis << ") ";
+      //  }
+      //  std::cout << std::endl;
+      //}
+     
+      // Print out PID information mis-IDs
+      if ((f_1e && !t_1e) || (f_1m && !t_1m)) {
+        std::cout << "true: " << mctruth.GetNeutrino().Nu().E() * 1000
+                  << "[" << mctruth.GetNeutrino().InteractionType() << "] ";
+        for (size_t k=0; k<particles_true.size(); k++) {
+          std::cout << particles_true[k] << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "est: " << ntracks << " tracks, "
+                             << nshowers << " showers; ";
+        for (size_t k=0; k<particles_found.size(); k++) {
+          std::cout << particles_found[k] << " ";
+        }
+        std::cout << std::endl;
+      }
+      unsigned int lep_id = 0;
+      // Write event to output tree for found 1l1p events
+      if (f_1e || f_1m) {
+        double eccqe=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
+
+        std::vector<double> eps;
+        std::vector<int> ppdgs;
+        for (size_t k=0; k<particles_found.size(); k++) {
+          if (particles_found[k].pdg == 2212) {
+            eps.push_back( particles_found[k].evis );
+            ppdgs.push_back( particles_found[k].pdgtrue );
+          }
+          else {
+            lep_id = particles_found[k].id;
+            eccqe = particles_found[k].eccqe;
+            elep = particles_found[k].evis;
+            thetalep = particles_found[k].p.Theta();
+            philep = particles_found[k].p.Phi();
+            lpid = particles_found[k].pdg;
+            lpdg = particles_found[k].pdgtrue;
+            llen = particles_found[k].len;
+            lexit = particles_found[k].exiting;
+          }
+        }
+
+        const simb::MCNeutrino& nu = mctruth.GetNeutrino();
+        const simb::MCParticle& pnu = nu.Nu();
+        const simb::MCParticle& plep = nu.Lepton();
+        TLorentzVector xp = (pnu.Momentum() - plep.Momentum());
+
+        std::map<std::string, std::vector<double> > wgh;
+        if (!eventweights_list.empty()) {
+          wgh = eventweights_list[0].fWeight;
+        }
+
+        _data->np = get_np(particles_found);
+        _data->n_trk = get_ntrk(particles_found);
+	_data->nupdg = nu.Nu().PdgCode();
+	_data->enu = nu.Nu().E();
+	_data->q2 = nu.QSqr();
+	_data->w = nu.W();
+	_data->q0 = xp.E();
+	_data->q3 = xp.Vect().Mag();
+	_data->int_type = nu.InteractionType();
+	_data->int_mode = nu.Mode();
+	_data->ccnc = nu.CCNC();
+	_data->eccqe = eccqe;
+	_data->eps = eps;
+	_data->ppdgs = ppdgs;
+	_data->elep = elep;
+	_data->thetalep = thetalep;
+	_data->philep = philep;
+	_data->lpdg = lpdg;
+	_data->lpid = lpid;
+	_data->llen = llen;
+	_data->lexit = lexit;
+	_data->bnbweight = wbnb;
+	_data->dataset = _dataset_id;
+	_data->weights = &wgh;
+        _data->event_number = _event_number;
+	_tree->Fill();
+      }
+      // block to contain filling truth data tree -- may include if statement later
+      {
+        double eccqe=-1, elep=-1, thetalep=-1, philep=-1, lpdg=-1, lpid=-1, llen=-1, lexit=-1;
+        std::vector<double> eps;
+        std::vector<int> ppdgs;
+        for (size_t k=0; k<particles_true.size(); k++) {
+          if (particles_true[k].pdg == 2212) {
+            eps.push_back( particles_true[k].evis );
+            ppdgs.push_back( particles_true[k].pdgtrue );
+          }
+          else {
+            if (lep_id == particles_true[k].id) {
+	      eccqe = particles_true[k].eccqe;
+	      elep = particles_true[k].evis;
+	      thetalep = particles_true[k].p.Theta();
+	      philep = particles_true[k].p.Phi();
+	      lpid = particles_true[k].pdg;
+	      lpdg = particles_true[k].pdgtrue;
+	      llen = particles_true[k].len;
+	      lexit = particles_true[k].exiting;
+            }
+          }
+        }
+
+        const simb::MCNeutrino& nu = mctruth.GetNeutrino();
+        const simb::MCParticle& pnu = nu.Nu();
+        const simb::MCParticle& plep = nu.Lepton();
+        TLorentzVector xp = (pnu.Momentum() - plep.Momentum());
+
+        std::map<std::string, std::vector<double> > wgh;
+        if (!eventweights_list.empty()) {
+          wgh = eventweights_list[0].fWeight;
+        }
+
+        _truth_data->np = get_np(particles_true);
+        _truth_data->n_trk = get_ntrk(particles_true);
+	_truth_data->nupdg = nu.Nu().PdgCode();
+	_truth_data->enu = nu.Nu().E();
+	_truth_data->q2 = nu.QSqr();
+	_truth_data->w = nu.W();
+	_truth_data->q0 = xp.E();
+	_truth_data->q3 = xp.Vect().Mag();
+	_truth_data->int_type = nu.InteractionType();
+	_truth_data->int_mode = nu.Mode();
+	_truth_data->ccnc = nu.CCNC();
+	_truth_data->eccqe = eccqe;
+	_truth_data->eps = eps;
+	_truth_data->ppdgs = ppdgs;
+	_truth_data->elep = elep;
+	_truth_data->thetalep = thetalep;
+	_truth_data->philep = philep;
+	_truth_data->lpdg = lpdg;
+	_truth_data->lpid = lpid;
+	_truth_data->llen = llen;
+	_truth_data->lexit = lexit;
+	_truth_data->bnbweight = wbnb;
+	_truth_data->dataset = _dataset_id;
+	_truth_data->weights = &wgh;
+        _truth_data->event_number = _event_number;
+	_truth_data_tree->Fill();
+      }
+
+
+      // Fill the event truth tree
+      if (_record_truth) {
+        float vtt[22] = {
 	  (float) mctruth.GetNeutrino().Nu().PdgCode(),
 	  (float) mctruth.GetNeutrino().Nu().E(),
 	  (float) mctruth.GetNeutrino().CCNC(),
+	  (float) mctruth.GetNeutrino().InteractionType(),
 	  (float) mctruth.GetNeutrino().Mode(),
 	  (float) mctruth.GetNeutrino().W(),
 	  (float) mctruth.GetNeutrino().QSqr(),
 	  (float) mctruth.GetNeutrino().Lepton().PdgCode(),
 	  (float) mctruth.GetNeutrino().Lepton().E(),
-	  (float) epmec[0],
-	  (float) epmec[1],
-	  (float) epmec[2],
-	  (float) epmec[3],
-	  (float) epmec[4]
+	  (float) gtruth.fGint,
+	  (float) gtruth.fNumPiPlus,
+	  (float) gtruth.fNumPiMinus,
+	  (float) gtruth.fNumPi0,
+	  (float) gtruth.fNumProton,
+	  (float) gtruth.fNumNeutron,
+	  (float) wbnb,
+	  (float) mctrack_list.size(),
+	  (float) ntracks,
+	  (float) 0,
+	  (float) mcshower_list.size(),
+	  (float) nshowers,
+	  (float) 0
         };
-        _mectree->Fill(v2);
+        _truthtree->Fill(vtt);
+      }
+
+
+      if (_record_mec) {
+        // Fill tree for MEC events with sorted proton energies
+        if (mctruth.GetNeutrino().Mode() == simb::kMEC) {
+          std::vector<float> epmec(5, -1);
+          for (size_t k=0; k<mctrack_list.size(); k++) {
+            const sim::MCTrack& t = mctrack_list[k];
+            if (t.PdgCode() == 2212 && t.Process() == "primary") {
+              double ke = t.Start().E() - tsutil::get_pdg_mass(t.PdgCode());
+              epmec.push_back(ke);
+            }
+          }
+
+          std::sort(epmec.begin(), epmec.end(), std::greater<>());
+
+          float v2[13] = {
+	    (float) mctruth.GetNeutrino().Nu().PdgCode(),
+	    (float) mctruth.GetNeutrino().Nu().E(),
+	    (float) mctruth.GetNeutrino().CCNC(),
+	    (float) mctruth.GetNeutrino().Mode(),
+	    (float) mctruth.GetNeutrino().W(),
+	    (float) mctruth.GetNeutrino().QSqr(),
+	    (float) mctruth.GetNeutrino().Lepton().PdgCode(),
+	    (float) mctruth.GetNeutrino().Lepton().E(),
+	    (float) epmec[0],
+	    (float) epmec[1],
+	    (float) epmec[2],
+	    (float) epmec[3],
+	    (float) epmec[4]
+          };
+          _mectree->Fill(v2);
+        }
       }
     }
   }
@@ -605,32 +754,34 @@ bool TSSelection::analyze(gallery::Event* ev) {
 
 bool TSSelection::finalize() {
   // Print out statistics
-  std::cout << "1e1p true: " << true_1e1p
-            << ", good: " << good_1e1p
-            << ", miss: " << miss_1e1p
+  std::cout << "1e true: " << _counts[ANY].true_1e
+            << ", good: " << _counts[ANY].good_1e
+            << ", miss: " << _counts[ANY].miss_1e
             << std::endl;
 
-  std::cout << "1e1p eff: "
-            << 1.0 * (good_1e1p + miss_1e1p) / true_1e1p
+  std::cout << "1e eff: "
+            << 1.0 * (_counts[ANY].good_1e + _counts[ANY].miss_1e) / _counts[ANY].true_1e
             << std::endl;
 
-  std::cout << "1e1p pur: "
-            << 1.0 * good_1e1p / (good_1e1p + miss_1e1p)
+  std::cout << "1e pur: "
+            << 1.0 * _counts[ANY].good_1e / (_counts[ANY].good_1e + _counts[ANY].miss_1e)
             << std::endl;
 
-  std::cout << "1m1p true: " << true_1m1p
-            << ", good: " << good_1m1p
-            << ", miss: " << miss_1m1p << std::endl;
+  std::cout << "1m true: " << _counts[ANY].true_1m
+            << ", good: " << _counts[ANY].good_1m
+            << ", miss: " << _counts[ANY].miss_1m << std::endl;
 
-  std::cout << "1m1p eff: "
-            << 1.0 * (good_1m1p + miss_1m1p) / true_1m1p
+  std::cout << "1m eff: "
+            << 1.0 * (_counts[ANY].good_1m + _counts[ANY].miss_1m) / _counts[ANY].true_1m
             << std::endl;
 
-  std::cout << "1m1p pur: "
-            << 1.0 * good_1m1p / (good_1m1p + miss_1m1p)
+  std::cout << "1m pur: "
+            << 1.0 * _counts[ANY].good_1m / (_counts[ANY].good_1m + _counts[ANY].miss_1m)
             << std::endl;
 
   std::cout << "SHOWER, TRACK ENERGY RESOLUTION: " << _shower_energy_resolution << " "<< _track_energy_resolution << std::endl;
+ std::cout << "ACCEPT NP " << _accept_np << std::endl;
+ std::cout << "ACCEPT NTRK " << _accept_ntrk << std::endl;
 
   // record header data
   _fout->cd();
@@ -654,8 +805,11 @@ bool TSSelection::finalize() {
   header_tree->Branch("shower_angle_by_percent", &to_header->shower_angle_by_percent);
   header_tree->Branch("track_angle_resolution", &to_header->track_angle_resolution);
   header_tree->Branch("track_angle_by_percent", &to_header->track_angle_by_percent);
-
+ 
+  header_tree->Branch("n_trials", &to_header->n_trials);
+  
   header_tree->Branch("accept_1p", &to_header->accept_1p);
+  header_tree->Branch("accept_0p", &to_header->accept_0p);
   header_tree->Branch("accept_np", &to_header->accept_np);
   header_tree->Branch("accept_ntrk", &to_header->accept_ntrk);
   header_tree->Branch("input_files", &to_header->input_files);
@@ -678,11 +832,16 @@ bool TSSelection::finalize() {
   header.track_angle_resolution = _track_angle_resolution;
   header.track_angle_by_percent = _track_angle_by_percent;
 
+  header.n_trials = _n_trials;
+
   header.accept_1p = _accept_1p;
+  header.accept_0p = _accept_0p;
   header.accept_np = _accept_np;
   header.accept_ntrk = _accept_ntrk;
 
   header.input_files = _input_files;
+
+  header.counts = std::map<EventType, EventCounts>(_counts);
 
   header_tree->Fill();
 
