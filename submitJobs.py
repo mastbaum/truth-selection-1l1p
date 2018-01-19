@@ -9,6 +9,7 @@ import itertools
 
 parser = argparse.ArgumentParser(description='Submit beam data jobs.')
 
+# arguments -- pretty much all of these pass an argument to RunSelection.cxx
 parser.add_argument("-f", "--first-file", dest="firstfile",
                     required=True,
                     help="First run.")
@@ -38,6 +39,8 @@ parser.add_argument("--all_combinations", action="store_true")
 
 args = parser.parse_args()
 
+
+# coherence checks on the passed in parameters 
 track_energy_distortion = args.track_energy_distortion
 shower_energy_distortion = args.shower_energy_distortion
 if args.all_combinations:
@@ -53,6 +56,8 @@ else:
 
 n_selections = 1 if track_energy_distortion is None else len(track_energy_distortion)
 
+# tar up the input files
+
 #now create jobfiles_*.tar that is shipped with the job
 #this includes the executable
 #tar -cf jobfiles.tar --transform '!^[^/]*/!!' file1 file2 file3
@@ -60,9 +65,11 @@ tarfilename="jobfiles_%i.tar.bz2"%os.getpid()
 outtar = tarfile.open(tarfilename, mode='w:bz2')
 outtar.add(args.f_list_name, arcname=args.f_list_name)
 outtar.add("truth_selection",arcname="truth_selection")
-outtar.add("dedx_pdfs.root", arcname="dedx_pdfs.root")
+if os.path.isfile("config.root"):
+    outtar.add("config.root", arcname="config.root")
 outtar.close()
 
+# pass required arguments to RunSelection.cxx
 truth_selection_args = ""
 truth_selection_args = "-o "
 for d in range(n_selections):
@@ -92,6 +99,7 @@ if args.drop_ntrk:
     truth_selection_args += " --drop_ntrk"
 truth_selection_args += " -t %i" % args.n_trials
 
+# the shell script that will be run on the grid
 ofstr='''
 #!/bin/bash
 
@@ -171,6 +179,7 @@ n_jobs = n_files / args.n_files_per_run
 if n_files % args.n_files_per_run != 0:
     n_jobs += 1
 
+# the jobsub command for actually running stuff on grid
 cmd="jobsub_submit --memory=1000MB --disk=10GB --group=uboone -N %i --tar_file_name=dropbox://%s file://%s"%(n_jobs,os.path.abspath(tarfilename),os.path.abspath(runjobfname))
 
 if (not args.debug):
