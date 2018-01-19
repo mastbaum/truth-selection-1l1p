@@ -345,6 +345,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
     const simb::MCTruth& mctruth = mctruth_list.at(i);
     const simb::GTruth& gtruth = gtruth_list.at(i);
 
+    // first collect the required information, get rid of events that fail 
+    // the minimum energy cut
     for (int trial_ind = 0; trial_ind < _n_trials; trial_ind ++) {
       size_t ntracks = 0, nshowers = 0;
 
@@ -484,6 +486,10 @@ bool TSSelection::analyze(gallery::Event* ev) {
 	  });
         }
       }
+
+      // Now cut based on the signal regions ntrack/0p/1p/np
+      // Each event can only have one lepton and is classified whether the lepton is 
+      // a muon or electron
 
       // get Event counts
       EventType event_types[5] = {PN, P0, P1, TRKN, ANY};
