@@ -47,15 +47,12 @@ def plot_spectra(numu_xvals, inc_numu_spectra, nue_xvals, inc_nue_spectra,
     sfs = pot / 5e19
 
     scaled_inc_numu = sfb * inc_numu_spectra * eff_m / truth_eff_m
-    scaled_inc_nue = sfb * inc_nue_spectra * eff_e / truth_eff_e
+    scaled_inc_nue = sfb * inc_nue_spectra * eff_e / truth_eff_e 
     scaled_nue_nue = sfb * nue_nue_spectra * eff_e / truth_eff_e
     scaled_signal_nue = sfs * signal_nue_spectra * eff_e / truth_eff_s
 
     scaled_background_nue = scaled_inc_nue + scaled_nue_nue
     scaled_background_numu = scaled_inc_numu
-
-    print scaled_inc_nue
-    print scaled_nue_nue
 
     eb = np.hstack((scaled_inc_numu, scaled_background_nue))
     covr = cov * np.einsum('i,j', eb, eb) #+ np.diag(eb)
@@ -162,7 +159,7 @@ def load(background_fname, inclusive_fname, nue_fname, signal_fname):
     inc_combined_spectra= np.maximum(1e-40, np.hstack((inc_numu_spectra, inc_nue_spectra)))
 
     background_combined_spectra = np.maximum(1e-40, \
-        np.hstack((inc_numu_spectra, inc_nue_spectra + nue_nue_spectra)))
+        np.hstack((inc_numu_spectra, nue_nue_spectra + inc_nue_spectra)))
 
     cov = cov[good[:,np.newaxis],good] / np.einsum('i,j', background_combined_spectra, background_combined_spectra) 
 
