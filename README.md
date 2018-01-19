@@ -6,6 +6,8 @@ Loop through MCTracks and MCShowers, doing PID based on dE/dx and other
 observable parameters, to build a list of tracks and showers in the event,
 then select based on that.
 
+**N.B. This documentation refers to an older version.**
+
 Tools
 -----
 ### TSSelection: Truth-Based Selection ###
