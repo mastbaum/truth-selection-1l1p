@@ -36,9 +36,9 @@ bool isNumber(const std::string& s)
 }
 
 // stand alone executable for TSSelection
-int main(int argv, char** argc) {
-  if (argv < 3) {
-    cout << "Must provide at least three input arguments: fout [fin]" << endl;
+int main(int argc, char** argv) {
+  if (argc < 3) {
+    cout << "Must provide at least two input arguments: fout [fin]" << endl;
     return 1;
   }
 
@@ -62,32 +62,47 @@ int main(int argv, char** argc) {
 
   std::vector<TFile *> f_outs;
   //We have passed the input file as an argument to the function 
+  //
+  // Argument parsing is fragile
+  // if you input things incorrectly, it might not fail in a good way
+  // probably use submitJobs.py to handle argument parsing
+  //
+  // If you set more than one selection, you should either pass in selection parameters 
+  // like the energy resolution or once for every selection. 
+  // I.e. the code fails unless energy_resolution.size() == 1 or energy_resolution.size() == n_selections
+  //
+  // takes in a list of input files as the arguments before any flags
+  //
+  // Since it is hard to parse particle id rates, things are set up to load from a config file. This config file
+  // can be generated from gen_config.C.
+  //
+  // not all features in the selection are implemented as argument parsing
   vector<string> filename;
-  for (int i = 1; i < argv; ++i) {
-    if (strcmp(argc[i], "-o") == 0 || strcmp(argc[i], "--output_file") == 0) {
-      while (i+1 < argv && argc[i+1][0] != '-') {
+  for (int i = 1; i < argc; ++i) {
+    if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output_file") == 0) {
+      while (i+1 < argc && argv[i+1][0] != '-') {
         i ++;
-        f_outs.push_back( new TFile(argc[i], "RECREATE") );
-        cout << "Output File " << f_outs.size() << ": " << argc[i] << endl;
+        f_outs.push_back( new TFile(argv[i], "RECREATE") );
+        cout << "Output File " << f_outs.size() << ": " << argv[i] << endl;
       }
       continue;
     }
-    if (strcmp(argc[i], "-n") == 0 || strcmp(argc[i], "--Nselections") == 0) {
+    if (strcmp(argv[i], "-n") == 0 || strcmp(argv[i], "--Nselections") == 0) {
       i ++;
-      n_selections = stoi(argc[i]);
+      n_selections = stoi(argv[i]);
       cout << "N Selections: " << n_selections << endl;
       continue;
     }
-    if (strcmp(argc[i], "-t") == 0 || strcmp(argc[i], "--Ntrials") == 0) {
+    if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--Ntrials") == 0) {
       i ++;
-      n_trials = stoi(argc[i]);
+      n_trials = stoi(argv[i]);
       cout << "N Trials: " << n_trials << endl;
       continue;
     }
-    if (strcmp(argc[i], "-d") == 0 || strcmp(argc[i], "--datasetId") == 0) {
-      while ( i+1 < argv && isNumber(argc[i+1]) ) {
+    if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--datasetId") == 0) {
+      while ( i+1 < argc && isNumber(argv[i+1]) ) {
         i ++;
-        dataset_id.push_back( stoi(argc[i]) );
+        dataset_id.push_back( stoi(argv[i]) );
       }
       cout << "Dataset Id: " ;
       for (auto d: dataset_id) {
@@ -96,10 +111,10 @@ int main(int argv, char** argc) {
       cout << endl;
       continue;
     }
-    if (strcmp(argc[i], "--T_energy_distortion") == 0) {
-      while( i+1 < argv && isNumber(argc[i+1]) ) {
+    if (strcmp(argv[i], "--T_energy_distortion") == 0) {
+      while( i+1 < argc && isNumber(argv[i+1]) ) {
         i ++;
-        track_energy_distortion.push_back( stof(argc[i]) );
+        track_energy_distortion.push_back( stof(argv[i]) );
       }
       cout << "Track Energy Distortion: ";
       for (auto dist: track_energy_distortion) {
@@ -108,15 +123,15 @@ int main(int argv, char** argc) {
       cout << endl;
       continue;
     }
-    if (strcmp(argc[i], "--T_edist_by_percent") == 0) {
+    if (strcmp(argv[i], "--T_edist_by_percent") == 0) {
       track_energy_distortion_by_percent = true;
       cout << "Track Energy Distortion By Percent"  << endl;
       continue;
     }
-    if (strcmp(argc[i], "--S_energy_distortion") == 0) {
-      while ( i+1 < argv && isNumber(argc[i+1]) ) {
+    if (strcmp(argv[i], "--S_energy_distortion") == 0) {
+      while ( i+1 < argc && isNumber(argv[i+1]) ) {
         i ++;
-        shower_energy_distortion.push_back( stof(argc[i]) );
+        shower_energy_distortion.push_back( stof(argv[i]) );
       }
       cout << "Shower Energy Distortion: ";
       for (auto dist: shower_energy_distortion) {
@@ -125,28 +140,28 @@ int main(int argv, char** argc) {
       cout << endl;
       continue;
     }
-    if (strcmp(argc[i], "--S_edist_by_percent") == 0) {
+    if (strcmp(argv[i], "--S_edist_by_percent") == 0) {
       shower_energy_distortion_by_percent = true;
       cout << "Shower Energy Distortion By Percent"  << endl;
       continue;
     }
-    if (strcmp(argc[i], "--drop_np") == 0) {
+    if (strcmp(argv[i], "--drop_np") == 0) {
       drop_np = true;
       cout << "Drop Np" << endl;
       continue;
     }
-    if (strcmp(argc[i], "--drop_ntrk") == 0) {
+    if (strcmp(argv[i], "--drop_ntrk") == 0) {
       drop_ntrack = true;
       cout << "Drop Ntrck" << endl;
       continue;
     }
-    if (strcmp(argc[i], "--root_config_file") == 0) {
+    if (strcmp(argv[i], "--root_config_file") == 0) {
       i++;
-      root_config_file_name = argc[i];
+      root_config_file_name = argv[i];
       continue;
     }
-    filename.push_back(string(argc[i]));
-    cout << "Input file: " << argc[i] << endl;
+    filename.push_back(string(argv[i]));
+    cout << "Input file: " << argv[i] << endl;
   }
 
   tsconfig::ConfigInfo *config = NULL;

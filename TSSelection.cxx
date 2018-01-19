@@ -53,6 +53,9 @@ void TSSelection::setTrackAngleResolution(float res, bool by_percent) {
   _track_angle_distribution = std::normal_distribution<float>(0., res);
 }
 
+// the number of protons you pass in is the signal region that will be changed
+// options:
+// zero protons, one proton, any number of protons
 void TSSelection::setAcceptP(bool b, int n_protons) {
   if (n_protons == 1)
     _accept_1p = b;
@@ -380,6 +383,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
           ntracks++;
         }
 
+        // collect variables for cuts
         int pdg_true = mct.PdgCode();
         float this_angle = mct.Start().Momentum().Theta();
         float this_energy = mct.Start().E() - tsutil::get_pdg_mass(mct.PdgCode());
@@ -404,6 +408,7 @@ bool TSSelection::analyze(gallery::Event* ev) {
         //  pdg_best = 2212;
         //}
 
+        // 
         bool pass_cut = tsutil::is_shower_pdgid(pdg_best) ? 
         (goodShower(isFromNuVertex, isPrimaryProcess, this_energy + energy_distortion, pdg_true)) :
         (goodTrack(isEmpty, isFromNuVertex, isPrimaryProcess, this_energy + energy_distortion, pdg_true)); 

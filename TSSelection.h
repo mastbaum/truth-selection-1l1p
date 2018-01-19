@@ -69,6 +69,12 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const PIDParticle& dt);
   };
 
+  // Class which implements particle-id confusion
+  //
+  // add(): configure with the rates to id particle "true_pdgid" as particle "test_pdgid"
+  // check(): check that every particle in the matrix has a chance of being id's as a particle of 1
+  // get(): get the rate that "true_pdgid" is id'd as "test_pdgid"
+  // set(): setup a confusion matrix with a previously set up map of particles -> id rates and a set of considered particles
   struct PDGConfusionMatrix {
     // map[true_pdg, fake_pdg] = the % chance to id a particle
     // w/ 'true_pdg' as a the particle 'fake_pdg'
@@ -129,6 +135,10 @@ public:
     }
   };
 
+  // list of typename T containing an instnace of T for different energy ranges
+  //
+  // set_energies(): sets the energy ranges being considered -- should be called before calling get()
+  // get(): returns a pointer to the object T contained in the given energy bucket
   template<typename T> class EnergyMap {
     public:
     std::vector<float> *_energies;
@@ -185,17 +195,24 @@ public:
   void setMCShowerProducer(std::string s) { _mcshw_producer = s; }
   void setMCTrackProducer(std::string s) { _mctrk_producer = s; }
 
+  // set the energy resolutions
+  // bool is whether the resolution is by_percent or is absolute
   void setShowerEnergyResolution(float, bool);
   void setTrackEnergyResolution(float, bool);
+  // get the energy distortion at that given energy generated from internal source of randomness 
   float nextShowerEnergyDistortion(float);
   float nextTrackEnergyDistortion(float);
 
+  // same thing as energy, but for angle
   void setShowerAngleResolution(float, bool);
   void setTrackAngleResolution(float, bool);
   float nextShowerAngleDistortion(float);
   float nextTrackAngleDistortion(float);
 
+  // get the next particle id based on confusion rates set by the PDGConfusionMatrix at that energy
   int nextParticleID(float energy, int true_pdgid);
+
+  // add in particle id rates to the different energy ranges
   void addParticleIDRate(int true_pdgid, int test_pdgid, float rate, float energy)
       { _particle_misid.get(energy)->add(true_pdgid, test_pdgid, rate); }
   void setParticleIDEnergyRange(std::vector<float> range) 
@@ -206,10 +223,10 @@ public:
     } 
   }
   
-
+  // setters 
   void setAcceptP(bool, int);
   void setAcceptNTrk(bool b) { _accept_ntrk = b; }
-
+  // number of throws for different random stuff like energy smearing, particle mis-id's
   void setNTrials(int n) { _n_trials = n; }
 
   // Set a numeric dataset ID, which is written into the tree as a tag
@@ -232,6 +249,8 @@ public:
     return !isEmpty && isFromNuVertex && isPrimaryProcess && pass_min_energy_cut(pdgid, energy);
   }
 
+  // energy cuts which are stand in for checking if given particle hits 3 wires
+  // energy cut definitions are from talk by Wes on Nov. 13 2017
   static inline bool pass_min_energy_cut(int pdgid, float energy) {
     if (abs(pdgid) == 13 || abs(pdgid) == 11 || abs(pdgid) == 211 || pdgid == 22) return energy > 20.;
     if (pdgid == 2212) return energy > 40.;
@@ -252,6 +271,7 @@ public:
     return isFromNuVertex && isPrimaryProcess && pass_min_energy_cut(pdgid, energy);
   }
 
+  // get the event type given Particle info defined above
   int get_nl(std::vector<PIDParticle>& p, int lpdg);
   int get_ntrk(std::vector<PIDParticle>& p);
   int get_np(std::vector<PIDParticle>& p);
