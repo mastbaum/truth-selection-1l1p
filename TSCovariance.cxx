@@ -221,6 +221,9 @@ void TSCovariance::init() {
   // use CCQE energy by default
   _use_ccqe = true;
 
+  // store everything by default
+  _store_cc_nue = true;
+  _store_not_cc_nue = true;
 
   std::cout << "TSCovariance: Initialized. Weights: ";
   for (auto it : use_weights) {
@@ -261,6 +264,14 @@ void TSCovariance::analyze() {
   // Event loop
   for (long k=0; k<_tree->GetEntries(); k++) {
     _tree->GetEntry(k);
+
+    bool is_cc_nue = abs(_data.nupdg) == 12 && _data.ccnc==0;
+    if (!_store_cc_nue && is_cc_nue) {
+      continue;
+    }
+    if (!_store_not_cc_nue && !is_cc_nue) {
+      continue;
+    }
 
     // Iterate through all the weighting functions to compute a set of
     // total weights for this event. mcWeight is a mapping from reweighting

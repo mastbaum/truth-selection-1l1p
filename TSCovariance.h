@@ -28,6 +28,8 @@ public:
   int WriteSystPlots(char* filename);
 
   void setUseCCQE(bool);
+  void setStoreCCNue(bool b) { _store_cc_nue = b; }
+  void setStoreNotCCNue(bool b) { _store_not_cc_nue = b; }
 
   void init();
   void analyze();
@@ -91,7 +93,7 @@ public:
       std::string name;  //!< String name for this event sample
       TH1D* enu;  //!< "Nominal" energy spectrum
       std::vector<TH1D*> enu_syst;  //!< Spectra for each systematic universe
-
+ 
     protected:
       TH2D* cov;  //!< Cached covariance matrix
   };
@@ -114,6 +116,11 @@ private:
   // whether to use the ccqe energy as the variable
   // if set to false, uses the lepton + proton (shower + track) energy
   bool _use_ccqe;
+
+  // variables for storing stuff
+  bool _store_cc_nue;
+  bool _store_not_cc_nue;
+
 };
 
 }  // namespace galleryfmwk
