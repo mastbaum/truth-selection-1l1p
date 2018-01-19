@@ -225,22 +225,31 @@ public:
     return (!t.empty() &&
             tsutil::isFromNuVertex(truth, t) &&
             t.Process() == "primary" &&
-            t.Start().E() - tsutil::get_pdg_mass(t.PdgCode()) + energy_distortion >= 60);
+            pass_min_energy_cut(t.PdgCode(), t.Start().E() - tsutil::get_pdg_mass(t.PdgCode()) + energy_distortion));
   }
 
-  static inline bool goodTrack(bool isEmpty, bool isFromNuVertex, bool isPrimaryProcess, float energy) {
-    return !isEmpty && isFromNuVertex && isPrimaryProcess && energy >= 60.;
+  static inline bool goodTrack(bool isEmpty, bool isFromNuVertex, bool isPrimaryProcess, int pdgid, float energy) {
+    return !isEmpty && isFromNuVertex && isPrimaryProcess && pass_min_energy_cut(pdgid, energy);
+  }
+
+  static inline bool pass_min_energy_cut(int pdgid, float energy) {
+    if (abs(pdgid) == 13 || abs(pdgid) == 11 || abs(pdgid) == 211 || pdgid == 22) return energy > 20.;
+    if (pdgid == 2212) return energy > 40.;
+    if (pdgid == 111) return true;
+    // we shouldn't be looking at any other particles
+    assert(false);
+    return false;
   }
 
   // Apply shower cuts
   static inline bool goodShower(const sim::MCShower& s, const simb::MCTruth& truth, float energy_distortion=0., float angle_distortion=0.) {
     return (tsutil::isFromNuVertex(truth, s) &&
             s.Process() == "primary" &&
-            (s.Start().E() - tsutil::get_pdg_mass(s.PdgCode())) + energy_distortion >= 30);
+            pass_min_energy_cut(s.PdgCode(), s.Start().E() - tsutil::get_pdg_mass(s.PdgCode()) + energy_distortion));
   }
 
-  static inline bool goodShower(bool isFromNuVertex, bool isPrimaryProcess, float energy) {
-    return isFromNuVertex && isPrimaryProcess && energy >= 30;
+  static inline bool goodShower(bool isFromNuVertex, bool isPrimaryProcess, int pdgid, float energy) {
+    return isFromNuVertex && isPrimaryProcess && pass_min_energy_cut(pdgid, energy);
   }
 
   int get_nl(std::vector<PIDParticle>& p, int lpdg);

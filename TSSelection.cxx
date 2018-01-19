@@ -405,8 +405,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
         //}
 
         bool pass_cut = tsutil::is_shower_pdgid(pdg_best) ? 
-        (goodShower(isFromNuVertex, isPrimaryProcess, this_energy + energy_distortion)) :
-        (goodTrack(isEmpty, isFromNuVertex, isPrimaryProcess, this_energy + energy_distortion)); 
+        (goodShower(isFromNuVertex, isPrimaryProcess, this_energy + energy_distortion, pdg_true)) :
+        (goodTrack(isEmpty, isFromNuVertex, isPrimaryProcess, this_energy + energy_distortion, pdg_true)); 
 
         if (pass_cut) {
           auto new_momentum = TLorentzVector(mct.Start().Momentum());
@@ -461,8 +461,8 @@ bool TSSelection::analyze(gallery::Event* ev) {
         int pdg_best = nextParticleID(this_energy + energy_distortion, pdg_true); 
 
         bool pass_cut = tsutil::is_shower_pdgid(pdg_best) ? 
-        (goodShower(isFromNuVertex, isPrimaryProcess, this_energy + energy_distortion)) :
-        (goodTrack(isEmpty, isFromNuVertex, isPrimaryProcess, this_energy + energy_distortion)); 
+        (goodShower(isFromNuVertex, isPrimaryProcess, this_energy + energy_distortion, pdg_true)) :
+        (goodTrack(isEmpty, isFromNuVertex, isPrimaryProcess, this_energy + energy_distortion, pdg_true)); 
 
         if (pass_cut) {
 	  TLorentzVector new_momentum(mcs.Start().Momentum());
