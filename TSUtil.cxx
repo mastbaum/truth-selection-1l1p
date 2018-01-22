@@ -94,6 +94,9 @@ double get_pdg_mass(const int pdg) {
   }
 }
 
+bool is_shower_pdgid(int pdg) {
+  return (pdg == 11 || pdg == 22);
+}
 
 TH2F* HistDEdx(const sim::MCTrack& t, const std::string name, int lowbin) {
   TH2F* h = new TH2F(name.c_str(), ";Residual range (cm?);dE/dx (MeV/cm)",

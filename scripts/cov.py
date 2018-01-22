@@ -90,8 +90,12 @@ parser = argparse.ArgumentParser("Scale input files and produce covariances")
 parser.add_argument("input_file")
 parser.add_argument("-d", "--directory", default=".")
 parser.add_argument("-s", "--signal", action="store_true")
+parser.add_argument("-n", "--ntrials", type=int, default=1)
+parser.add_argument("--inclusive_only_sample", action="store_true")
+parser.add_argument("--ccnue_only_sample", action="store_true")
 args = parser.parse_args()
 
+factor = 1. / float(args.ntrials)
 # A group with all parameters varied
 wg['all'] = []
 for v in wg.values():
@@ -106,14 +110,45 @@ if args.signal:
    sfe = 5.0e19 / 1.86828e+21  # Signal sample
 else:
    sfe = 5.0e19 / 8.47443e+21  # CCnue sample
-"""
 # UPDATED VALUES:
-sfm = 5.0e19 / 2.72261e+19  # BNB inclusive (!CCnue) sample
-if args.signal:
-   sfe = 5.0e19 / 1.668035e+21  # Signal sample
+
+   sfe = 5.0e19 / 881249999999999934464. # e21 makross
+   #sfe = 5.0e19 / 1.668035e+21  # Signal sample
 else:
    sfe = 5.0e19 / 7.86397e+21  # CCnue sample
+"""
+# UPDATED AGAIN:
+sfm = 5.0e19 /    509366499999999983616. #e+20  # BNB inclusive (!CCnue) sample
+if args.signal:
+   print "USING SIGNAL"
+   sfe = 5.0e19 / 863849999999999934464. #e+20  # Signal makross weightedsample
+   #sfe = 5.0e19 / 1668035000000000032768. #e+21  # Other signal sample
+else:
+   sfe = 5.0e19 / 7863970000000000196608. #e+21  # CCnue sample
 
+sfe *= factor
+print "TRIAL FACTOR: %f" % factor
+
+for w in ['all']:
+    ws = wg[w]
+    print w
+    m = galleryfmwk.TSCovariance()
+    if args.inclusive_only_sample:
+        m.setStoreCCNue(False)
+    if args.ccnue_only_sample:
+        m.setStoreNotCCNue(False)
+    
+    m.SetInputFile(args.input_file)
+    m.SetScaleFactorE(sfe)
+    m.SetScaleFactorMu(sfm)
+    for ww in ws:
+        m.AddWeight(ww)
+    m.SetOutputFile(args.directory + '/cov_%s.root' % w)
+    m.init()
+    m.analyze()
+    del m
+
+"""
 # Produce output file with covariances for each group
 for w, ws in wg.items():
     print w
@@ -132,7 +167,7 @@ for w, ws in wg.items():
 for w in wg['all']:
     print w
     m = galleryfmwk.TSCovariance()
-    m.SetInputFile(sys.argv[1])
+    m.SetInputFile(args.input_file)
     m.SetScaleFactorE(sfe)
     m.SetScaleFactorMu(sfm)
     m.AddWeight(w)
@@ -140,4 +175,5 @@ for w in wg['all']:
     m.init()
     m.analyze()
     del m
+"""
 

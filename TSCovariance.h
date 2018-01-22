@@ -20,10 +20,16 @@ public:
   void AddWeight(std::string w);
   void SetScaleFactorE(double _sf) { fScaleFactorE = _sf; }
   void SetScaleFactorMu(double _sf) { fScaleFactorMu = _sf; }
+  void SetEEfficiencyBins(std::vector<float> bins);
+  void SetAEfficiencyBins(std::vector<float> bins);
+  void SetEfficiencies(std::vector<float> eff);
+  float GetEffWeight(float energy, float angle);
   void SetSeed(int _seed) { fSeed = _seed; }
   int WriteSystPlots(char* filename);
 
   void setUseCCQE(bool);
+  void setStoreCCNue(bool b) { _store_cc_nue = b; }
+  void setStoreNotCCNue(bool b) { _store_not_cc_nue = b; }
 
   void init();
   void analyze();
@@ -87,7 +93,7 @@ public:
       std::string name;  //!< String name for this event sample
       TH1D* enu;  //!< "Nominal" energy spectrum
       std::vector<TH1D*> enu_syst;  //!< Spectra for each systematic universe
-
+ 
     protected:
       TH2D* cov;  //!< Cached covariance matrix
   };
@@ -102,9 +108,19 @@ private:
   double fScaleFactorMu;  //!< POT scaling, etc.
   int fSeed;  //!< Random seed for ROOT
 
+  // efficiencies from energy, angle
+  std::vector<float> _energy_efficiency_bins;
+  std::vector<float> _angle_efficiency_bins;
+  std::vector<float> _efficiencies;
+
   // whether to use the ccqe energy as the variable
   // if set to false, uses the lepton + proton (shower + track) energy
   bool _use_ccqe;
+
+  // variables for storing stuff
+  bool _store_cc_nue;
+  bool _store_not_cc_nue;
+
 };
 
 }  // namespace galleryfmwk
