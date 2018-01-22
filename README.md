@@ -56,7 +56,7 @@ Where `[input_files]` is a list of space-separated input root files,
 output analysis trees, and `--args` are any other command line 
 arguments you with to use.
 
-# Command Line Arguments #
+*Command Line Arguments*
 To be written.
 
 **Selection Usage on the Grid:**
