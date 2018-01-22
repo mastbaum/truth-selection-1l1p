@@ -74,7 +74,7 @@ script, but rather just write it out to a file.
 
 `submitJobs.py` assumes that the `truth_selection` binary is in the
 directory where it is run, and it assumes that any `config.root` file is
-there is as well if the argument for using a config file is set.
+there as well if the argument for using a config file is set.
 
 Minimal Example call:
 
@@ -195,7 +195,7 @@ the POT and the efficiency. The POT can be calculated using
 `scripts/utils/run_pot.py` and is normalized in TSCovariance. The POT 
 that you want to use when calculating significance/generating plots 
 can then be set in `scripts/analysis/chi2.py`. In addition, the efficiency 
-can be caluclated from counters in the output TTRee's from TSSelection 
+can be caluclated from counters in the output TTree's from TSSelection 
 (which are correctly added up by the mergeing scripts) and is normalized 
 in `scripts/analysis/chi2.py` to be a number reasonable for a real analysis
 (30% by default).
